@@ -44,7 +44,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -159,7 +159,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -798,7 +798,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -960,7 +960,7 @@
       VERNUM = 41.45
       WRITE (VERTXT, '(F5.2)') VERNUM                                     40.03
       CALL BUGFIX ('A')
-      !CALL BUGFIX ('B')
+      CALL BUGFIX ('B')
 !
       CALL OCPINI ('swaninit', .TRUE.,INERR)                              34.01
       IF (INERR.GT.0) RETURN                                              34.01
@@ -3563,7 +3563,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -4140,6 +4140,7 @@
       IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN
 !        *** allocate frequency- and space-dependent data for LTA/DCTA
          IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN
+            MSC4D = MSC
             ISTAT=0
             IF (.NOT.ALLOCATED(QTRI1))
      &                             ALLOCATE(QTRI1(MSC,MCGRD),STAT=ISTAT)
@@ -4224,7 +4225,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -4616,7 +4617,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5270,7 +5271,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5671,7 +5672,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5798,7 +5799,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5925,7 +5926,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -6091,7 +6092,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -6188,7 +6189,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -6660,7 +6661,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -7417,7 +7418,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -8035,7 +8036,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -8474,7 +8475,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -8811,7 +8812,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -9113,7 +9114,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -9200,7 +9201,6 @@
       IF (ALLOCATED(BPHTMP))   DEALLOCATE(BPHTMP)
       IF (ALLOCATED(QTRI1 ))   DEALLOCATE(QTRI1 )
       IF (ALLOCATED(QTRI2 ))   DEALLOCATE(QTRI2 )
-      IF (ALLOCATED(SA    ))   DEALLOCATE(SA    )
 !
       IF (ALLOCATED(xcugrd  )) DEALLOCATE(xcugrd  )
       IF (ALLOCATED(ycugrd  )) DEALLOCATE(ycugrd  )

@@ -11,7 +11,7 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -93,6 +93,7 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
     use SwanGridobjects
     use SwanCompdata
     use SwanQCM
+    use m_snl3
     use m_parall
 !METIS    use SwanParallel
 !
@@ -260,6 +261,8 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
     real, dimension(:,:,:), allocatable   :: memsina   ! auxiliary array to store results of linear wind input in full spectral space
     real, dimension(:,:,:), allocatable   :: memsinb   ! auxiliary array to store results of exponential wind input in full spectral space
     real, dimension(:,:,:), allocatable   :: obredf    ! action reduction coefficient based on transmission
+    real, dimension(:,:), allocatable     :: qtl1      ! local interpolation factors for triads
+    real, dimension(:,:), allocatable     :: qtl2      ! local scaling factors for triads
     real, dimension(:,:,:), allocatable   :: redc0     ! explicit part of redistribution in present vertex for output purposes
     real, dimension(:,:,:), allocatable   :: redc1     ! implicit part of redistribution in present vertex for output purposes
     real, dimension(:,:), allocatable     :: reflso    ! contribution to the source term due to reflection
@@ -438,6 +441,7 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
     !$omp private(disc0, disc1, genc0, genc1, redc0, redc1, trac0, trac1, leakcf) &
     !$omp private(sigft, cgft, uxft, uyft, cft, rft, sft, wft, wsave, cfd, wfd, wsavd) &
     !$omp private(ue, sa1, sa2, sfnl) &
+    !$omp private(qtl1, qtl2) &
     !$omp private(da1c, da1p, da1m, da2c, da2p, da2m, dsnl) &
     !$omp private(tid, ivlow, ivup, iter, kvert) &
     !$omp private(ivert, jc, k, j, icell, n, v, vu, swpnr, swpdir, sdir, rdx, rdy, lpredt, vb, ve, iface, link, inocnt, thmin, thmax, th1, th2) &
@@ -623,6 +627,19 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
        allocate(da2p(0,0))
        allocate(da2m(0,0))
        allocate(dsnl(0,0))
+    endif
+    !
+    if ( ITRIAD > 0 .and. ITRIAD /= 2 ) then
+       if (ITRIAD == 1 .or. ITRIAD == 11) then
+          allocate(qtl1(MSC,1))
+          allocate(qtl2(  0,0))
+       else if (ITRIAD == 5) then
+          allocate(qtl1(MSC4D,2))
+          allocate(qtl2(MSC4D,2))
+       endif
+    else
+       allocate(qtl1(0,0))
+       allocate(qtl2(0,0))
     endif
 !TIMG    call SWTSTO(101)
     !
@@ -1091,6 +1108,19 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
 !TIMG                         call SWTSTO(115)
                          if ( IWIND > 0 .and. IWIND /= 4 ) compda(ivert,JUSTAR) = ufric
                          !
+                         ! fill in the triad interpolation and scaling factors for current grid point
+                         !
+                         if ( ITRIAD > 0 .and. ITRIAD /= 2 ) then
+                            if (ITRIAD == 1 .or. ITRIAD == 11) then
+                               qtl1(:,1) = qtri1(:,KCGRD(1))
+                            else if (ITRIAD == 5) then
+                               qtl1(:,1) = qtri1(:,1)
+                               qtl1(:,2) = qtri1(:,2)
+                               qtl2(:,1) = qtri2(:,KCGRD(1),1)
+                               qtl2(:,2) = qtri2(:,KCGRD(1),2)
+                            endif
+                         endif
+                         !
                          ! compute the source terms
                          !
 !TIMG                         call SWTSTA(117)
@@ -1118,7 +1148,7 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
                                        wwawg               , wwswg               , cgo                 , compda(1,JUSTAR)    , &
                                        compda(1,JZEL)      , spcdir              , anywnd              , dmw                 , &
                                        fbd                 , membrg              ,                                             &
-                                       cas                 ,                                                                   &
+                                       cas                 , qtl1                , qtl2                ,                       &
                                        memsina             , memsinb             ,                                             &
                                        disc0               ,                                                                   &
                                        disc1               , genc0               , genc1               , redc0               , &
@@ -1567,6 +1597,9 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
     deallocate(da2p)
     deallocate(da2m)
     deallocate(dsnl)
+    !
+    deallocate(qtl1)
+    deallocate(qtl2)
 !TIMG    call SWTSTO(101)
     !
     ! end of parallel region

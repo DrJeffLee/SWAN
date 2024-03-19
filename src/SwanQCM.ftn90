@@ -13,7 +13,7 @@ module SwanQCM
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -93,7 +93,7 @@ subroutine SWQCINIT ( BGRIDP, COMPDA )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -570,6 +570,10 @@ subroutine SWQCINIT ( BGRIDP, COMPDA )
     !
     ! QC domain delimited by a multiple of the mean wave number or user-prescribed maximum scattering wave number
     qmax = min (qmu, alfa * kmean) / max(dkx,dky)
+    if ( qmax < 2. ) then
+       call msgerr (1,'range of the QC convolution integral too small - set to minimum required range')
+       qmax = 2.
+    endif
     ncoz = 2*floor(ceiling(qmax)/2.)   ! must be even number to execute the QC summation correctly (see routine SWQCSCAT)
     dxps = clen / real(ncoz) / 2.
     !
@@ -703,7 +707,7 @@ subroutine SWQCDFT ( sigft, cgft, dep2, kwave, cgo, cft, rft, sft, wft, wsave )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -949,7 +953,7 @@ subroutine SWQCUFT ( uxft, uyft, dep2, ux2, uy2, cft, rft, sft, wft, wsave )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1178,7 +1182,7 @@ subroutine QCSOURCE ( imatra, imatda, iter  , ac2   , dep2  , ux2   , uy2   , &
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1423,7 +1427,7 @@ subroutine SWQCWIG ( W, dwdx, dwdy, ac2, dep2, rdx, rdy, spcdir, spcsig )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1662,7 +1666,7 @@ subroutine SwanGradWig ( W, dwdx, dwdy, ac2, dep2, spcdir, spcsig )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2056,7 +2060,7 @@ subroutine SWQCSCAT ( memqcm, W, dwdx, dwdy, sigft, cgft, uxft, uyft, dep2, kwav
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2373,7 +2377,7 @@ subroutine SWQCSURF ( memqcb, ac2, dep2, cfd, wfd, wsavd, kwave, cgo, spcdir, sp
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3193,7 +3197,7 @@ subroutine FILQCM ( imatra, idcmin, idcmax, isstop, memqcm, memqcb, plqcs, plwbr
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3348,7 +3352,7 @@ subroutine tukeywin ( a, n )
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by

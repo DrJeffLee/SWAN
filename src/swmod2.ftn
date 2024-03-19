@@ -26,7 +26,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -147,7 +147,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -376,7 +376,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -476,7 +476,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -529,14 +529,16 @@
 !     ISM1  : negative range for IS
 !     ISP   : positive range for IS
 !     ISP1  : positive range for IS
+!     MSC4D : dimension for QTRI arrays
 !     QTRI1 : frequency-dependent interpolation data
 !     QTRI2 : frequency- and space-dependent scaling factors
-!     SA    : interaction contribution for LTA
 !     TCOLL : true if collinear, otherwise noncollinear
 !     WISM  : interpolation weight factor corresponding to lower harmonic
 !     WISM1 : interpolation weight factor corresponding to lower harmonic
 !     WISP  : interpolation weight factor corresponding to higher harmonic
 !     WISP1 : interpolation weight factor corresponding to higher harmonic
+!
+      INTEGER MSC4D
 !
       INTEGER  ISM,  ISM1,  ISP,  ISP1
       REAL    WISM, WISM1, WISP, WISP1
@@ -544,7 +546,6 @@
       REAL   , DIMENSION(:)    , SAVE, ALLOCATABLE :: BPHTMP
       REAL   , DIMENSION(:,:)  , SAVE, ALLOCATABLE :: QTRI1
       REAL   , DIMENSION(:,:,:), SAVE, ALLOCATABLE :: QTRI2
-      REAL   , DIMENSION(:,:)  , SAVE, ALLOCATABLE :: SA
 !
       LOGICAL :: TCOLL
 
@@ -586,7 +587,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -794,7 +795,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -921,7 +922,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1078,7 +1079,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1272,7 +1273,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
