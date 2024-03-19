@@ -81,7 +81,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -521,7 +521,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -712,7 +712,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1208,7 +1208,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -1608,7 +1608,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2000,7 +2000,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2404,7 +2404,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2690,7 +2690,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -2817,7 +2817,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3019,7 +3019,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3156,7 +3156,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3498,7 +3498,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3610,8 +3610,6 @@
          ISM1   = ISM - 1
          WISM   = (XIS**ISM -0.5) / (XIS**ISM - XIS**ISM1)
          WISM1  = 1. - WISM
-
-         IF (.NOT.ALLOCATED(SA)) ALLOCATE (SA(1:MDC,1:MSC+ISP1))
 !
          DO IP = 1, MCGRD
 !
@@ -3759,7 +3757,7 @@
       SUBROUTINE SWLTA ( AC2   , DEP2  , SPCSIG,
      &                   IMATRA, IMATDA, REDC0 , REDC1 ,
      &                   IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                   SMEBRK, PLTRI , URSELL, BIPHAS )
+     &                   SMEBRK, PLTRI , URSELL, BIPHAS, QTL1  )
 !
 !****************************************************************
 !
@@ -3783,7 +3781,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -3891,6 +3889,7 @@
 !     IMATRA      right-hand side of system of equations
 !     ISSTOP      maximum frequency counter in a sweep
 !     PLTRI       triad contribution in TEST points
+!     QTL1        frequency-dependent scaling factor
 !     SMEBRK      average (angular) frequency
 !     SPCSIG      relative frequencies in computational domain in sigma-space
 !     URSELL      Ursell number
@@ -3907,6 +3906,7 @@
       REAL :: PLTRI(MDC,MSC,NPTST)
       REAL :: URSELL(MCGRD)
       REAL :: BIPHAS(MCGRD)                                               41.97
+      REAL :: QTL1(MSC,1)                                                 42.01
       REAL :: REDC0 (MDC,MSC,MREDS)                                       40.85
       REAL :: REDC1 (MDC,MSC,MREDS)                                       40.85
 !
@@ -3935,6 +3935,7 @@
 !     ISMAX :     maximum of the counter in frequency space for
 !                 which the triad interactions are calculated (cut-off)
 !     PWDTH :     integral range in rad. / 2
+!     SA    :     interaction contribution of triad
 !     SIGPI :     frequency times 2pi
 !     SINBPH:     sine of biphase
 !     STRI  :     total triad contribution
@@ -3942,7 +3943,7 @@
       INTEGER ID, ID1, ID2, IDD, IDDUM, IDW, IENT, II, IS, ISMAX
       REAL    BIPH, DEP, E0, ED0, EDM,
      &        EM, FT, PWDTH, SIGPI, SINBPH, STRI
-      REAL    E(MSC), ED(MSC)
+      REAL    E(MSC), ED(MSC), SA(MDC,MSC+ISP1)
 !
 !  9. Subroutines calling
 !
@@ -4047,7 +4048,7 @@
                  EDM = 0.
               END IF
 
-              FT = QTRI1(IS,KCGRD(1)) * SINBPH
+              FT = QTL1(IS,1) * SINBPH
 
               SA(ID,IS) = MAX(0., FT * ( EDM * (EM - E0) - ED0 * EM ))    41.44
 
@@ -4125,7 +4126,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -4445,7 +4446,8 @@
       SUBROUTINE SWDCTA ( AC2   , DEP2  , CGO   , SPCSIG,
      &                    IMATRA, IMATDA, REDC0 , REDC1 ,
      &                    IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                    SIGM  , PLTRI , URSELL, BIPHAS )
+     &                    SIGM  , PLTRI , URSELL, BIPHAS,
+     &                    QTL1  , QTL2  )
 !
 !****************************************************************
 !
@@ -4468,7 +4470,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -4541,6 +4543,8 @@
 !     IMATRA      right-hand side of system of equations
 !     ISSTOP      maximum frequency counter in a sweep
 !     PLTRI       triad contribution in TEST points
+!     QTL1        frequency-dependent interpolation factors
+!     QTL2        frequency-dependent scaling factors
 !     SIGM        mean angular frequency
 !     SPCSIG      relative frequencies in computational domain in sigma-space
 !     URSELL      Ursell number
@@ -4559,6 +4563,7 @@
       REAL :: BIPHAS(MCGRD)
       REAL :: REDC0 (MDC,MSC,MREDS)
       REAL :: REDC1 (MDC,MSC,MREDS)
+      REAL :: QTL1(MSC4D,2), QTL2(MSC4D,2)
 !
 !  6. Local variables
 !
@@ -4663,15 +4668,15 @@
 !
 !                   --- obtain third energy density by means of interpolation
 !
-                    WIS = QTRI1(J,1)
-                    IS3 = INT(QTRI1(J,2))
+                    WIS = QTL1(J,1)
+                    IS3 = INT(QTL1(J,2))
 
                     E3 = (1.-WIS) * E(IS3) + WIS * E(IS3+1)
 !
 !                   --- assemble the triad contributions
 !
-                    STRI1 = QTRI2(J,KCGRD(1),1) * E3 * E1
-                    STRI2 = QTRI2(J,KCGRD(1),2) * E3 * E2
+                    STRI1 = QTL2(J,1) * E3 * E1
+                    STRI2 = QTL2(J,2) * E3 * E2
 !
                     SAN(ID,IS1) = SAN(ID,IS1) + STRI1 * FRINTF * SIG2
                     SAP(ID,IS1) = SAP(ID,IS1) + STRI2 * FRINTF * SIG2
@@ -4720,7 +4725,8 @@
       SUBROUTINE SWDNCTA ( AC2   , DEP2  , CGO   , SPCSIG, SPCDIR,
      &                     KWAVE , IMATRA, IMATDA, REDC0 , REDC1 ,
      &                     IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                     ETOT  , SIGM  , PLTRI , URSELL, BIPHAS )
+     &                     ETOT  , SIGM  , PLTRI , URSELL, BIPHAS,
+     &                     QTL1  , QTL2  )
 !
 !******************************************************************
 !
@@ -4743,7 +4749,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -4818,6 +4824,8 @@
 !     ISSTOP      maximum frequency counter in a sweep
 !     KWAVE       wave number
 !     PLTRI       triad contribution in TEST points
+!     QTL1        frequency-dependent interpolation factors
+!     QTL2        frequency-dependent scaling factors
 !     SIGM        mean angular frequency
 !     SPCDIR      (*,1); spectral directions (radians)
 !                 (*,2); cosine of spectral directions
@@ -4843,6 +4851,7 @@
       REAL :: BIPHAS(MCGRD)
       REAL :: REDC0 (MDC,MSC,MREDS)
       REAL :: REDC1 (MDC,MSC,MREDS)
+      REAL :: QTL1(MSC4D,2), QTL2(MSC4D,2)
 !
 !  6. Local variables
 !
@@ -5008,8 +5017,8 @@
 !
 !                      --- obtain third energy density by means of interpolation
 !
-                       WIS = QTRI1(J,1)
-                       IS3 = INT(QTRI1(J,2))
+                       WIS = QTL1(J,1)
+                       IS3 = INT(QTL1(J,2))
 !
                        OUTSID = .FALSE.
 !
@@ -5068,8 +5077,8 @@
 !
 !                         --- assemble the triad contributions
 !
-                          STRI1 = QTRI2(J,KCGRD(1),1) * FT2 * E3 * E1
-                          STRI2 = QTRI2(J,KCGRD(1),2) * FT2 * E3 * E2
+                          STRI1 = QTL2(J,1) * FT2 * E3 * E1
+                          STRI2 = QTL2(J,2) * FT2 * E3 * E2
 !
                           DS2DD = FRINTF * SIG2 * DDIR
 !
@@ -5255,7 +5264,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5390,7 +5399,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -5643,7 +5652,7 @@
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by

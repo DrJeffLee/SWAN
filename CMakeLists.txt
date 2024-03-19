@@ -1,6 +1,6 @@
 # a CMake script to build SWAN
 #
-# Copyright (C) 2023  Delft University of Technology
+# Copyright (C) 2024  Delft University of Technology
 
 # use of CMake version 3.12 or greater
 cmake_minimum_required( VERSION 3.12 )

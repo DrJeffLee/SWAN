@@ -11,7 +11,7 @@ subroutine SwanReadADCGrid
 !
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2023  Delft University of Technology
+!     Copyright (C) 1993-2024  Delft University of Technology
 !
 !     This program is free software: you can redistribute it and/or modify
 !     it under the terms of the GNU General Public License as published by
@@ -31,11 +31,13 @@ subroutine SwanReadADCGrid
 !
 !   40.80: Marcel Zijlema
 !   41.07: Casey Dietrich
+!   42.08: Casey Dietrich
 !
 !   Updates
 !
 !   40.80, December 2007: New subroutine
 !   41.07,   August 2009: use ADCIRC boundary info to mark all boundary vertices
+!   42.08, December 2023: use global-to-local tables from ADCIRC
 !
 !   Purpose
 !
