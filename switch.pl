@@ -15,7 +15,6 @@ $coh = "FALSE";
 $met = "FALSE";
 $ncf = "FALSE";
 $mv4 = "FALSE";
-$outdir=".";
 while ( $ARGV[0]=~/-.*/ )
    {
    if ($ARGV[0]=~/-esmf/) {$esmf="TRUE";shift;}
@@ -34,11 +33,6 @@ while ( $ARGV[0]=~/-.*/ )
    if ($ARGV[0]=~/-metis/) {$met="TRUE";shift;}
    if ($ARGV[0]=~/-netcdf/) {$ncf="TRUE";shift;}
    if ($ARGV[0]=~/-matl4/) {$mv4="TRUE";shift;}
-   if ($ARGV[0]=~/-outdir/){
-       shift;
-       $outdir=$ARGV[0];
-       shift;
-       }
    }
 
 # --- trap unsupported switch combinations
@@ -65,13 +59,13 @@ foreach $file (@files)
   {
     ($tempf)=split(/.ftn/, $file);
     $ext = ($file =~ m/ftn90/) ? "f90" : "f";
-    $outfile = join("",$outdir,"/",$tempf,".",$ext);
+    $outfile = join(".",$tempf,$ext);
   }
   else
   {
     ($tempf)=split(/.ftn/, $file);
     $ext = ($file =~ m/ftn90/) ? "f90" : "for";
-    $outfile = join("",$outdir,"\\",$tempf,".",$ext);
+    $outfile = join(".",$tempf,$ext);
   }
 # --- process file
   if (   (! -e $outfile)            #outfile doesn't exist
