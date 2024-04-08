@@ -638,6 +638,7 @@
 !
 !  7. Local variables
 !
+!     ALOBND  : if true, user has specified boundary conditions
 !     BFILED  : data concerning boundary condition files
 !     BGP     : array containing data w.r.t. boundary grid points
 !     BSPLOC  : place in array BSPECS where to store interpolated spectra
@@ -667,6 +668,8 @@
 !               2: wave period (peak or mean)
 !               3: average wave direction
 !               4: directional distribution coefficient
+
+      LOGICAL :: ALOBND
 
       TYPE BSPCDAT
          INTEGER                :: BFILED(20)
