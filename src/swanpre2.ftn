@@ -2478,6 +2478,7 @@
       USE SWCOMM2                                                         40.41
       USE SWCOMM3                                                         40.41
       USE M_BNDSPEC                                                       40.31
+      USE M_PARALL, ONLY: NBGGL
       USE SwanGriddata                                                    40.80
       USE SwanGridobjects                                                 40.80
       USE SwanCompdata                                                    40.80
@@ -2779,6 +2780,13 @@
      &    ' command READ BOT or READ UNSTRUC must precede this command')  40.80
           GOTO 900
         ENDIF
+        IF (.NOT.ALOBND) THEN
+           NBGRPT = 0
+           NBSPEC = 0
+           NBFILS = 0
+           NBGGL  = 0
+           ALOBND = .TRUE.
+        ENDIF
 !
         IF (OPTG.EQ.5) THEN                                               40.80
            CALL MSGERR(2,
@@ -2821,6 +2829,13 @@
      &    ' command READ BOT or READ UNSTRUC must precede this command')  40.80
           GOTO 900
         ENDIF
+        IF (.NOT.ALOBND) THEN
+           NBGRPT = 0
+           NBSPEC = 0
+           NBFILS = 0
+           NBGGL  = 0
+           ALOBND = .TRUE.
+        ENDIF
 !
         IF (OPTG.EQ.5) THEN                                               40.80
            CALL MSGERR(2,
@@ -2861,6 +2876,13 @@
           CALL MSGERR(3,
      &    ' command READ BOT or READ UNSTRUC must precede this command')  40.80
           GOTO 900
+        ENDIF
+        IF (.NOT.ALOBND) THEN
+           NBGRPT = 0
+           NBSPEC = 0
+           NBFILS = 0
+           NBGGL  = 0
+           ALOBND = .TRUE.
         ENDIF
 !
         NBFILS = NBFILS + 1
@@ -2934,6 +2956,13 @@
           CALL MSGERR(3,
      &    ' command READ BOT or READ UNSTRUC must precede this command')  40.80
           GOTO 900
+        ENDIF
+        IF (.NOT.ALOBND) THEN
+           NBGRPT = 0
+           NBSPEC = 0
+           NBFILS = 0
+           NBGGL  = 0
+           ALOBND = .TRUE.
         ENDIF
 !
 !       first define side or segment
