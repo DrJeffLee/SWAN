@@ -226,8 +226,6 @@
 
       INTEGER, SAVE :: NREOQ = 0         ! actual number of requests saved
 
-      LOGICAL, SAVE :: LBV = .FALSE.
-
 !     unit number PVD files
       INTEGER :: UPVDF(1:MAX_OUTP_REQ)
 
@@ -540,8 +538,8 @@
 !
       INTEGER MSC4D
 !
-      INTEGER  ISM,  ISM1,  ISP,  ISP1
-      REAL    WISM, WISM1, WISP, WISP1
+      INTEGER  ISM(3,2),  ISM1(3,2),  ISP(3),  ISP1(3)
+      REAL    WISM(3,2), WISM1(3,2), WISP(3), WISP1(3)
 !
       REAL   , DIMENSION(:)    , SAVE, ALLOCATABLE :: BPHTMP
       REAL   , DIMENSION(:,:)  , SAVE, ALLOCATABLE :: QTRI1
@@ -878,7 +876,7 @@
          INTEGER                :: FBTYP1, FBTYP2
          REAL                   :: FBCOEF(3)
          INTEGER                :: IGTYP
-         REAL                   :: IGCOEF(5)
+         REAL                   :: IGCOEF(7)
          REAL, POINTER          :: IGFRQD(:)
          INTEGER                :: NCRPTS
          REAL, POINTER          :: XCRP(:), YCRP(:)

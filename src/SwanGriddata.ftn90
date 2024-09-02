@@ -71,6 +71,7 @@ module SwanGriddata
     integer, dimension(:), save, allocatable   :: ivertg         ! global vertex index of local vertex
     integer, dimension(:), save, allocatable   :: vmark          ! boundary marker for vertices
     !
+    integer                                    :: excmark        ! exception boundary marker
     integer                                    :: nsweep         ! fixed number of sweeps through grid
     !
     real                                       :: asort          ! ordering of vertices along user-given/wave/wind direction

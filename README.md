@@ -2,7 +2,7 @@
 
 SWAN is a third-generation wave model that computes random, short-crested wind-generated waves in coastal regions and inland waters.
 For more in-depth background and scientific documentation, the reader is referred to the [SWAN website](https://swanmodel.sourceforge.io).
-Please also check the [release notes](https://swanmodel.sourceforge.io/modifications/modifications.htm) for any additional information on the current version **41.45**.
+Please also check the [release notes](https://swanmodel.sourceforge.io/modifications/modifications.htm) for any additional information on the current version **41.51**.
 
 This Readme provides a brief overview of software installation and configuration instructions for users and developers.
 Please see the [Implementation Manual](https://swanmodel.sourceforge.io/online_doc/swanimp/swanimp.html) for additional documentation.

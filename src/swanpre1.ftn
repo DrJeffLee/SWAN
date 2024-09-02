@@ -309,7 +309,7 @@
       INTEGER           :: IVAL,NUMCOR,MSS,I,J,NVAR,IVTYPE,IFTMAX
       REAL              :: TRCF,HGT,SLP,BK,OGAM,OBET,REF0,XP,YP
       REAL              :: GAMR, GAMT                                     41.71
-      REAL              :: AFIG, HSS, TSS, DSS                            42.06 41.82
+      REAL              :: AFIG, HSS, TSS, DSS, MFR, SHP                  42.09 42.06 41.82
       REAL              :: ALTMP,FRLOW,FRHIG,GAMMA,TMPDIR,VALX,VALY
       REAL*8            :: DIFF
       REAL              :: DEGCNV
@@ -953,13 +953,13 @@
 !             |  DAM <                                    |
 !                     |    DANGremond [hgt] [slope] [Bk]  |
 !
-!      ( FIG [alpha1] [hss] [tss] [dss] [dd] )                &           42.06 41.82
+!     ( FIG [alpha1] [hss] [tss] [dss] [dd] [minfr] [shape] ) &           42.09 42.06 41.82
 !                                                                         40.18
-!                        | -> RSPEC        |                              40.18
-!      ( REFLec [reflc] <                   > )               &
-!                        |    RDIFF [pown] |                              40.13 40.18
+!                       | -> RSPEC        |                               40.18
+!     ( REFLec [reflc] <                   > )                &
+!                       |    RDIFF [pown] |                               40.13 40.18
 !
-!      ( FREEboard [hgt] [gammat] [gammar] Quay )             &           41.71
+!     ( FREEboard [hgt] [gammat] [gammar] Quay )              &           41.71
 !
 !             LINe < [xp] [yp] >                                          40.18 40.09
 !
@@ -991,6 +991,8 @@
         OBSTMP%IGCOEF(3) = 0.                                             41.82
         OBSTMP%IGCOEF(4) = 0.                                             42.06
         OBSTMP%IGCOEF(5) = 0.                                             42.06
+        OBSTMP%IGCOEF(6) = 0.                                             42.09
+        OBSTMP%IGCOEF(7) = 0.                                             42.09
 !
 !       data concerning transmission of energy over/through the obstacle
 !
@@ -1128,11 +1130,15 @@
            CALL INREAL ('TSS'   , TSS , 'UNC', 0.)                        41.82
            CALL INREAL ('DSS'   , DSS , 'STA', -999.)                     42.06
            CALL INREAL ('DD'    , DD  , 'STA', 0.)                        42.06
+           CALL INREAL ('MINFR' , MFR , 'STA', 0.015)                     42.09
+           CALL INREAL ('SHAPE' , SHP , 'STA', 1.5)                       42.09
            OBSTMP%IGCOEF(1) = AFIG
            OBSTMP%IGCOEF(2) = HSS
            OBSTMP%IGCOEF(3) = TSS
            OBSTMP%IGCOEF(4) = DSS
            OBSTMP%IGCOEF(5) = DD
+           OBSTMP%IGCOEF(6) = MFR
+           OBSTMP%IGCOEF(7) = SHP
         ELSE
            LFIG = 0
         ENDIF
@@ -1525,10 +1531,35 @@
             IF ( PARLL .AND. .NOT.LOGCOM(7) )                             42.10
      &         CALL MSGERR (4,                                            42.10
      &          'to run in parallel the mesh must be partitioned first')  42.10
+!
+!           --- create copies of parts of xcugrd and ycugrd               43.01
+!               for each subdomain                                        43.01
+            IF (.NOT.ALLOCATED(xcugrdgl)) ALLOCATE(xcugrdgl(nvertsg))     43.01
+            IF (.NOT.ALLOCATED(ycugrdgl)) ALLOCATE(ycugrdgl(nvertsg))     43.01
+            xcugrdgl = xcugrd                                             43.01
+            ycugrdgl = ycugrd                                             43.01
+            DEALLOCATE(xcugrd,ycugrd)                                     43.01
+            ALLOCATE(xcugrd(nverts))                                      43.01
+            ALLOCATE(ycugrd(nverts))                                      43.01
+!
+            IF ( .NOT.PARLL ) THEN                                        43.01
+               xcugrd = xcugrdgl                                          43.01
+               ycugrd = ycugrdgl                                          43.01
+            ELSE                                                          43.01
+               DO J = 1, nverts                                           43.01
+                  I = ivertg(J)                                           43.01
+                  xcugrd(J) = xcugrdgl(I)                                 43.01
+                  ycugrd(J) = ycugrdgl(I)                                 43.01
+               ENDDO                                                      43.01
+            ENDIF                                                         43.01
+!
+!           --- create grid topology
             CALL SwanCreateEdges                                          40.80
             IF (STPNOW()) RETURN                                          40.80
             CALL SwanGridTopology                                         40.80
             IF (STPNOW()) RETURN                                          40.80
+!
+!           --- initialize arrays for unstructured mesh
             CALL SwanInitCompGrid (LOGCOM)                                40.80
             IF (STPNOW()) RETURN                                          40.80
 !
@@ -2129,7 +2160,7 @@
 !   SET  [level]  [nor]  [depmin]  [maxmes]                &
 !        [maxerr]  [grav]  [rho] [cdcap] [uscap] [inrhog]  &
 !        [hsrerr]  CARTesian/NAUTical  [pwtail] [froudmax] &
-!        [icewind]                                         &
+!        [icewind]  [excmark]                              &
 !        [sort]  [nsweep]  CURV  (not documented)
 !        [printf]  [prtest] (not documented)
 !
@@ -2165,6 +2196,7 @@
          ENDIF
          CALL INREAL ('FROUDMAX', PNUMS(18), 'UNC', 0.)                   30.50
          CALL INREAL ('ICEWIND' , ICEWIND  , 'UNC', 0.)
+         CALL ININTG ('EXCMARK' , excmark  , 'UNC', 0 )                   43.01
          CALL INREAL ('SORT'    , usort    , 'UNC', 0.)                   41.68 41.48
          CALL ININTG ('NSWEEP'  , nsweep   , 'UNC', 0 )                   41.68
          IF (KEYWIS ('CURV')) CCURV = .TRUE.                              41.53
@@ -3274,22 +3306,30 @@
 !
 ! ============================================================
 !
-!                                 / -> COLL
+!                                  / -> COLL
 !           | -> DCTA [trfac] [p]  \    NONC
 !           |
-!   TRIad  <     LTA [trfac] [cutfr] [dint]            &
+!           |    LTA [trfac] [cutfr] [dint]
+!   TRIad  <                                               &
+!           |    FTIM [trfac] [dint]
 !           |
 !           |    SPB [trfac] [a] [b] [dint]
 !
 !
 !                  | -> ELDeberky [urcrit]
 !                  |
-!         BIPHase <  SAPRykina [a]   (NOT documented)
+!         BIPHase <  SAPRykina [a]   (NOT documented)      &
 !                  |
 !                  | WIT [lpar]
 !
 !
-!   TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim]   (obsolete)
+!                   |    FG
+!         TRAnsfer <     MS
+!                   |    BRedmose
+!                   | -> QUadwave
+!
+!
+!   TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim] [ic]  (obsolete)
 !
 ! ============================================================
 !
@@ -3307,8 +3347,8 @@
           ! ==========================================================================
           !
           ITRIAD = 1
-          CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 0.8)
-          CALL INREAL ('CUTFR', PTRIAD(2), 'STA', 2.5)
+          CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 1.0)
+          CALL INREAL ('CUTFR', PTRIAD(2), 'STA', -1.)
           CALL INREAL ('DINT' , PTRIAD(8), 'STA',60.0)
           !
         ELSE IF ( KEYWIS('DCTA') ) THEN
@@ -3322,7 +3362,6 @@
           ITRIAD = 5
           CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 4.4 )
           CALL INREAL ('P'    , PTRIAD(2), 'STA', 4./3.)
-          !
           !
         ELSE IF ( KEYWIS('SPB') ) THEN
           !
@@ -3338,24 +3377,39 @@
           CALL INREAL ('B'    , PTRIAD(7), 'STA', 0.0 )
           CALL INREAL ('DINT' , PTRIAD(8), 'STA',-1.  )
           !
+        ELSE IF ( KEYWIS('FTIM') ) THEN
+          !
+          ! ==========================================================================
+          !
+          ! TRIad FTIM [trfac] [dint]
+          !
+          ! ==========================================================================
+          !
+          ITRIAD = 3
+          CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 1.)
+          CALL INREAL ('DINT' , PTRIAD(8), 'STA',-1.)
+          !
         ELSE
           !
           ! ==========================================================================
           !
-          ! TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim]
+          ! TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim] [ic]
           !
           ! ==========================================================================
           !
           CALL ININTG ('ITRIAD', ITRIAD, 'STA', 5)
           IF (ITRIAD.EQ.1) THEN
-             CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 0.8)                 41.97 41.76 41.44
-             CALL INREAL ('CUTFR', PTRIAD(2), 'STA', 2.5)                 40.61 40.56 30.82
+             CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 1.0)                 42.15 41.97 41.76 41.44
+             CALL INREAL ('CUTFR', PTRIAD(2), 'STA', -1.)                 42.11 40.61 40.56 30.82
              CALL INREAL ('DINT' , PTRIAD(8), 'STA',60.0)                 42.01
           ELSEIF (ITRIAD.EQ.2) THEN
              CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 0.90)                41.46
              CALL INREAL ('A'    , PTRIAD(6), 'STA', 0.95)                41.46
              CALL INREAL ('B'    , PTRIAD(7), 'STA', 0.0 )                41.46
              CALL INREAL ('DINT' , PTRIAD(8), 'STA',-1.  )                42.01
+          ELSEIF (ITRIAD.EQ.3) THEN                                       42.15
+             CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 1.)                  42.15
+             CALL INREAL ('DINT' , PTRIAD(8), 'STA',-1.)                  42.15
           ELSEIF (ITRIAD.EQ.5) THEN
              CALL INREAL ('TRFAC', PTRIAD(1), 'STA', 4.4 )                42.01 41.45
              CALL INREAL ('P'    , PTRIAD(2), 'STA', 4./3.)               42.01
@@ -3365,8 +3419,9 @@
              CALL INREAL ('CUTFR', PTRIAD(2), 'STA', 2.5)
              PTRIAD(8) = 0.
           ENDIF
-          CALL INREAL ('URCRIT', PTRIAD(4), 'STA', 0.63)                  41.97 40.13
-          CALL INREAL ('URSLIM', PTRIAD(5), 'STA', 0.1 )                  41.97 40.41 40.23 40.13
+          CALL INREAL ('URCRIT', PTRIAD(4) , 'STA', 0.63)                 41.97 40.13
+          CALL INREAL ('URSLIM', PTRIAD(5) , 'STA', 0.1 )                 41.97 40.41 40.23 40.13
+          CALL INREAL ('IC'    , PTRIAD(10), 'STA', -1. )                 42.15
           !
         ENDIF
         !
@@ -3400,6 +3455,21 @@
               CALL IGNORE ('ELD')
               IBIPH = 1
               CALL INREAL ('URCRIT', PTRIAD(4), 'STA', 0.63)
+           ENDIF
+        ENDIF
+        !
+        CALL INKEYW ('REQ',' ')
+        IF (KEYWIS('TRA') .OR. KEYWIS('IC')) THEN
+           CALL INKEYW ('STA', 'QU')
+           IF (KEYWIS('FG')) THEN
+              PTRIAD(10) = 1.
+           ELSEIF (KEYWIS('MS')) THEN
+              PTRIAD(10) = 2.
+           ELSEIF (KEYWIS('BR')) THEN
+              PTRIAD(10) = 3.
+           ELSE
+              CALL IGNORE ('QU')
+              PTRIAD(10) = 4.
            ENDIF
         ENDIF
         !

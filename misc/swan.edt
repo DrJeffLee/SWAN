@@ -4,9 +4,10 @@
 !            'title3'
 !
 !   SET  [level]  [nor]  [depmin]  [maxmes]                                 &
-!        [maxerr]  [grav]  [rho] [cdcap] [uscap] [inrhog]                   &
+!        [maxerr]  [grav]  [rho]  [cdcap]  [uscap]  [inrhog]                &
 !        [hsrerr]  CARTesian|NAUTical  [pwtail]                             &
-!        [froudmax]  [icewind]  [sort]  [nsweep]  CURV  [printf]  [prtest]
+!        [froudmax]  [icewind]  [excmark]  [sort]  [nsweep]  CURV           &
+!        [printf]  [prtest]
 !
 !   MODE  / STATIONARY \  / TWODimensional
 !         \ DYNAMIC    /  \ ONEDimensional
@@ -167,15 +168,22 @@
 !              |    RIPples [S] [D]
 !
 !
-!          |                       / -> COLL
-!          | -> DCTA [trfac] [p]   \    NONC
-!          |                                           | -> ELDeberky [urcrit]
-!   TRIad <     LTA [trfac] [cutfr] [dint]    BIPHase <
-!          |                                           | WIT [lpar]
-!          |    SPB [trfac] [a] [b] [dint]
+!          |                       / -> COLL |
+!          | -> DCTA [trfac] [p]   \    NONC |
+!          |                                 |
+!          |    LTA [trfac] [cutfr] [dint]   |
+!   TRIad <                                   >                             &
+!          |    FTIM [trfac] [dint]          |
+!          |                                 |
+!          |    SPB [trfac] [a] [b] [dint]   |
+!
+!              | -> ELDeberky [urcrit] |             |    FG
+!     BIPHase <                         >  TRAnsfer <     MS
+!              | WIT [lpar]            |             |    BRedmose
+!                                                    | -> QUadwave
 !
 !
-!   TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim]
+!   TRIad [itriad] [trfac] [cutfr] [dint] [a] [b] [p] [urcrit] [urslim] [ic]
 !
 !
 !   BRAGg [ibrag] [nreg] [cutoff]                                           &
@@ -221,7 +229,7 @@
 !
 !        LINe < [xp] [yp] >
 !
-!   OBSTacle  FIG [alpha1] [hss] [tss] [dss] [dd]                           &
+!   OBSTacle  FIG [alpha1] [hss] [tss] [dss] [dd] [minfr] [shape]           &
 !
 !             ( REFLec [reflc] )                                            &
 !

@@ -782,7 +782,7 @@
       USE SWCOMM3                                                         40.41
       USE SWCOMM4                                                         40.41
       USE TIMECOMM                                                        40.41
-      USE OUTP_DATA, ONLY: NREOQ, LBV, LOPS, LORQ, UPVDF                  41.95 41.79
+      USE OUTP_DATA, ONLY: NREOQ, LOPS, LORQ, UPVDF                       41.95 41.79
       USE M_SNL4                                                          40.17
       USE M_BNDSPEC                                                       40.31
       USE M_PARALL                                                        40.31
@@ -961,10 +961,10 @@
 ! 13. Source text
 !
       VERTXT = BLANK                                                      40.03
-      VERNUM = 41.45
+      VERNUM = 41.51
       WRITE (VERTXT, '(F5.2)') VERNUM                                     40.03
-      CALL BUGFIX ('A')
-      CALL BUGFIX ('B')
+!      CALL BUGFIX ('A')
+!      CALL BUGFIX ('B')
 !
       CALL OCPINI ('swaninit', .TRUE.,INERR)                              34.01
       IF (INERR.GT.0) RETURN                                              34.01
@@ -1075,6 +1075,7 @@
       ALPC   = 0.
       FULCIR = .TRUE.
       SPDIR1 = 0.
+      excmark = 999                                                       43.01
       asort  = -999.                                                      41.48
       usort  = -999.                                                      41.68
       nsweep = -999                                                       41.68
@@ -1431,7 +1432,7 @@
       PICE    = 0.                                                        41.81
 !
 !     triad interactions
-      PTRIAD(1)  = 0.8                                                    41.97 41.76 41.44 40.61 30.82
+      PTRIAD(1)  = 1.0                                                    42.15 41.97 41.76 41.44 40.61 30.82
       PTRIAD(2)  = 2.5                                                    40.61 40.56 30.82
       PTRIAD(3)  = 10.                                                    40.23
       PTRIAD(4)  = 0.63                                                   41.97 40.13
@@ -1445,6 +1446,7 @@
 !      PTRIAD(7)  = -0.75                                                  41.46
       PTRIAD(7)  = 0.                                                     41.46
       PTRIAD(8)  = 60.                                                    42.01 41.46
+      PTRIAD(10) = -1.                                                    42.15
 !
 !     quadruplet interactions
       PQUAD(1) = 0.25                                                     34.00
@@ -1628,7 +1630,6 @@
 !     ***** output *****
       IUBOTR = 0
       NREOQ  = 0                                                          41.79
-      LBV    = .FALSE.                                                    41.79
       UPVDF  = 0                                                          41.95
 !     ***** plot output *****
 !
@@ -3554,6 +3555,7 @@
       USE M_PARALL                                                        40.31
       USE M_DIFFR                                                         40.21
       USE SwanGriddata                                                    40.80
+      USE SwanCompdata                                                    43.01
       USE SwanIEM                                                         41.85
 !
 !
@@ -3599,6 +3601,7 @@
 !     41.82: Dirk Rijnsdorp
 !     41.85: Ad Reniers
 !     41.90: Gal Akrish, Pieter Smit and Marcel Zijlema
+!     43.01: Marcel Zijlema
 !
 !  1. Updates
 !
@@ -3619,6 +3622,7 @@
 !     41.82, Aug. 21: introduce FIG source term
 !     41.85, Apr. 22: implementation of IEM (surfbeat model)
 !     41.90, Nov. 21: adding QC scattering
+!     43.01, Aug. 24: parallelization of unstructured boundaries and their conditions
 !
 !  2. Purpose
 !
@@ -3668,8 +3672,10 @@
       INTEGER   BGRIDP(6*NBGRPT)                                          40.31
       REAL      BSPECS(MDC,MSC,NBSPEC,2)                                  40.31
       INTEGER, ALLOCATABLE :: CROSSGL(:,:)                                40.31
+      INTEGER   ITMP(1)                                                   43.01
       INTEGER   IUNT(NUNT)
       REAL      FDN, FIGF                                                 41.82
+      REAL      MFR, SHP                                                  42.09
 !
       INTEGER   ISTAT, IF1, IL1                                           42.01
       CHARACTER*20 NUMSTR, CHARS(1)                                       42.01
@@ -3944,11 +3950,13 @@
             COBST%TRCOEF(1) = TRCF                                        41.82
             COBST%FBTYP1    = IFREE                                       41.82
             IF ( IFIG.EQ.1 ) THEN                                         41.82
+               MFR = COBST%IGCOEF(6)                                      42.09
+               SHP = COBST%IGCOEF(7)                                      42.09
                ALLOCATE(COBST%IGFRQD(MSC))                                41.82
                COBST%IGFRQD(:) = 0.                                       41.82
                FDN = 0.                                                   41.82
                DO JJ = 1, MSC                                             41.82
-                  FIGF = MIN( 1., 2.*PI * 0.015 / SPCSIG(JJ) )**1.5       41.82
+                  FIGF = MIN( 1., 2.*PI * MFR / SPCSIG(JJ) )**SHP         42.09 41.82
                   COBST%IGFRQD(JJ) = FIGF                                 41.82
                   FDN = FDN + SPCSIG(JJ) * FIGF                           41.82
                ENDDO                                                      41.82
@@ -4003,7 +4011,7 @@
 
       BGRIDP = 0                                                          40.31
       IF (OPTG.NE.5) THEN                                                 40.80
-         IF (NBGGL.EQ.0) NBGGL  = NBGRPT                                  40.51 40.31
+         IF (NBGGL.EQ.0) NBGGL = NBGRPT                                   40.51 40.31
          NBGRPT = 0                                                       40.31
          DO IX = MXF, MXL                                                 40.31
             DO IY = MYF, MYL                                              40.31
@@ -4026,18 +4034,53 @@
             END DO                                                        40.31
          END DO                                                           40.31
       ELSE                                                                40.80
+         IF (NBGGL.EQ.0) NBGGL = NBGRPT                                   43.01
+         NBGRPT = 0                                                       43.01
          CURBGP => FBGP                                                   40.80
-         DO II = 1, NBGRPT                                                40.80
-            BGRIDP(6*II-5) = CURBGP%BGP(1)                                40.80
-            BGRIDP(6*II-4) = CURBGP%BGP(2)                                40.80
-            BGRIDP(6*II-3) = CURBGP%BGP(3)                                40.80
-            BGRIDP(6*II-2) = CURBGP%BGP(4)                                40.80
-            BGRIDP(6*II-1) = CURBGP%BGP(5)                                40.80
-            BGRIDP(6*II  ) = CURBGP%BGP(6)                                40.80
+         DO II = 1, NBGGL                                                 43.01 40.80
+            INDXGR = CURBGP%BGP(1)                                        43.01
+            ITMP   = MINLOC(ABS(bvertg(:,2)-INDXGR))                      43.01
+            K      = ITMP(1)                                              43.01
+            IF ( bvertg(K,2).EQ.INDXGR ) THEN                             43.01
+               IX = bvertg(K,1)                                           43.01
+               NBGRPT = NBGRPT + 1                                        43.01
+               BGRIDP(6*NBGRPT-5) = IX                                    43.01 40.80
+               BGRIDP(6*NBGRPT-4) = CURBGP%BGP(2)                         43.01 40.80
+               BGRIDP(6*NBGRPT-3) = CURBGP%BGP(3)                         43.01 40.80
+               BGRIDP(6*NBGRPT-2) = CURBGP%BGP(4)                         43.01 40.80
+               BGRIDP(6*NBGRPT-1) = CURBGP%BGP(5)                         43.01 40.80
+               BGRIDP(6*NBGRPT  ) = CURBGP%BGP(6)                         43.01 40.80
+            END IF                                                        43.01
             IF (.NOT.ASSOCIATED(CURBGP%NEXTBGP)) EXIT                     40.80
             CURBGP => CURBGP%NEXTBGP                                      40.80
          ENDDO                                                            40.80
       ENDIF                                                               40.80
+!
+!     --- test BGRIDP for unstructured mesh                               43.01
+      IF ( OPTG.NE.5 ) THEN                                               43.01
+         GOTO 201                                                         43.01
+      ELSEIF ( ITEST.GE.50 ) THEN                                         43.01
+         IF ( NBGRPT.GT.0 ) THEN                                          43.01
+           WRITE(PRTEST,*)                                                43.01
+     &     ' number of described boundary points in present subdomain ',  43.01
+     &     NBGRPT                                                         43.01
+           DO IB = 1, NBGRPT                                              43.01
+              IC = BGRIDP(6*IB-5)                                         43.01
+              IF (.NOT.PARLL) THEN                                        43.01
+                 ICG = IC                                                 43.01
+              ELSE                                                        43.01
+                 ICG = ivertg(IC)                                         43.01
+              ENDIF                                                       43.01
+              IF (BGRIDP(6*IB-4).EQ.1)                                    43.01
+     &           WRITE(PRTEST,'(A,I7,2F18.9,I7)')                         43.01
+     &                       ' BGRIDP: INDXGL, XP, YP, bound marker ',    43.01
+     &                       ICG,                                         43.01
+     &                       xcugrd(IC)+XOFFS,                            43.01
+     &                       ycugrd(IC)+YOFFS,                            43.01
+     &                       vmark(IC)                                    43.01
+           ENDDO                                                          43.01
+         ENDIF                                                            43.01
+      ENDIF                                                               43.01
 !
  201  CONTINUE
 !
@@ -4147,14 +4190,20 @@
 !
 !     --- preparation for triads                                          42.01
 !
-      IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN
-!        *** allocate frequency- and space-dependent data for LTA/DCTA
+      IF ( ITRIAD.GT.0 ) THEN
+!        *** allocate frequency- and space-dependent data for triads
          IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN
             MSC4D = MSC
             ISTAT=0
-            IF (.NOT.ALLOCATED(QTRI1))
-     &                             ALLOCATE(QTRI1(MSC,MCGRD),STAT=ISTAT)
-            IF (.NOT.ALLOCATED(QTRI2)) ALLOCATE(QTRI2(0,0,0))
+            IF (.NOT.ALLOCATED(QTRI2))
+     &                           ALLOCATE(QTRI2(MSC,MCGRD,2),STAT=ISTAT)
+            IF (.NOT.ALLOCATED(QTRI1)) ALLOCATE(QTRI1(0,0))
+         ELSE IF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.3) THEN
+            MSC4D = MSC*MSC+MSC*(MSC-1)/2
+            IF (.NOT.ALLOCATED(QTRI1)) ALLOCATE(QTRI1(MSC4D,2))
+            ISTAT=0
+            IF (.NOT.ALLOCATED(QTRI2))
+     &                         ALLOCATE(QTRI2(MSC4D,MCGRD,4),STAT=ISTAT)
          ELSE IF (ITRIAD.EQ.5) THEN
             IF (TCOLL) THEN
                MSC4D = MSC*(MSC-1)/2
@@ -4176,7 +4225,7 @@
             RETURN
          END IF
       ELSE
-         IF (.NOT.ALLOCATED(QTRI1)) ALLOCATE(QTRI1(0,0)  )
+         IF (.NOT.ALLOCATED(QTRI1)) ALLOCATE(QTRI1(0,0  ))
          IF (.NOT.ALLOCATED(QTRI2)) ALLOCATE(QTRI2(0,0,0))
       ENDIF
 !
@@ -4192,9 +4241,6 @@
          MTH = MDC                                                        42.01
          IF ( .NOT.FULCIR ) MTH = MDC - 1                                 42.01
          IF ( .NOT.PWDTH.LT.FLOAT(MTH)*DDIR ) PTRIAD(8) = -1.             42.01
-!        maintain original definition zero bandwidth in case of SPB       42.01
-!        (see routine COAPP)                                              42.01
-         IF ( ITRIAD.EQ.2 .AND. .NOT.PWDTH.NE.0. ) PTRIAD(8) = -1.        42.01
       ENDIF                                                               42.01
 !
 !     check biphase in case no triads                                     41.97
@@ -6455,9 +6501,27 @@
 !     check absolute stopping criterion
       IF ( .NOT. PNUMS(2).NE.-1. ) THEN
          IF ( IQCM.EQ.0 ) THEN
-            PNUMS(2) = 0.005
+            IF ( ITRIAD.NE.3 ) THEN
+               PNUMS(2) = 0.005
+            ELSE
+               PNUMS(2) = 0.01
+            ENDIF
          ELSE
             PNUMS(2) = 0.05
+         ENDIF
+      ENDIF
+!
+!     check transfer function for triads, if appropriate
+!
+      IF ( ITRIAD.GT.0 ) THEN
+         IF ( .NOT. PTRIAD(10).NE.-1. ) THEN
+            IF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.11) THEN
+!              SPB or original LTA: use Madsen and Sorensen (1993)
+               PTRIAD(10) = 2.
+            ELSE
+!              otherwise use QuadWave of Akrish et al (2024)
+               PTRIAD(10) = 4.
+            ENDIF
          ENDIF
       ENDIF
 !
@@ -6582,7 +6646,7 @@
          ENDIF
       ENDIF
 !
-!     Check whether limiter should be de-activated
+!     check whether limiter should be de-activated
 !
       IF (IQUAD.EQ.0 .AND. PNUMS(20).LT.100.) THEN                        40.41
          CALL MSGERR(1,
@@ -6590,7 +6654,7 @@
          PNUMS(20) = 1.E+20
       END IF
 !
-!     Check resolution in frequency-space when DIA is used                40.41
+!     check resolution in frequency-space when DIA is used                40.41
 !
       IF (IQUAD.GT.0 .AND. IQUAD.LE.3 .OR. IQUAD.EQ.8) THEN               40.41
          GAMMA = EXP(ALOG(SHIG/SLOW)/REAL(MSC-1))                         40.31
@@ -9032,8 +9096,8 @@
 !     --- unstructured grid
 !
       DO INX = 1, nverts                                                  40.80
-!        internal vertices and ghost vertices only
-         IF ( vmark(INX) == 0 .or. vmark(INX) == 999 ) THEN               40.95
+!        internal, exception and ghost vertices only
+         IF ( vmark(INX) == 0 .or. vmark(INX) >= excmark ) THEN           43.01 40.95
             TESTFL = .FALSE.
             DO IPTST = 1, NPTST
               IF (INX.EQ.XYTST(IPTST)) TESTFL = .TRUE.
@@ -9220,6 +9284,8 @@
       IF (ALLOCATED( vmark  )) DEALLOCATE( vmark  )
       IF (ALLOCATED( vlist  )) DEALLOCATE( vlist  )
       IF (ALLOCATED( blist  )) DEALLOCATE( blist  )
+      IF (ALLOCATED(bvertg  )) DEALLOCATE(bvertg  )
+      IF (ALLOCATED( bmark  )) DEALLOCATE( bmark  )
 !
 !METIS      IF (ALLOCATED(ipown   )) DEALLOCATE(ipown   )
 !METIS      IF (ALLOCATED(vres    )) DEALLOCATE(vres    )

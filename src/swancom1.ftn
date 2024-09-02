@@ -961,9 +961,9 @@
      &                WWINT ,WWAWG ,WWSWG )                               40.41
 !TIMG      CALL SWTSTO(135)                                                    40.41
 !
-!     --- store frequency- and space-dependent data for LTA/DCTA          42.01
+!     --- store frequency- and space-dependent data for triads            42.01
 !TIMG      CALL SWTSTA(134)                                                    42.01
-      IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN                           42.01
+      IF ( ITRIAD.GT.0 ) THEN                                             42.15 42.01
          IF (IT.EQ.1 .OR. DYNDEP) CALL FAC3WW ( COMPDA(1,JDP2), SPCSIG )  42.01
       ENDIF                                                               42.01
 !TIMG      CALL SWTSTO(134)                                                    42.01
@@ -1262,10 +1262,13 @@
         ALLOCATE(DSNL(0,0))                                               40.22
       END IF
 !     *** triads ***                                                      42.01
-      IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN                           42.01
+      IF ( ITRIAD.GT.0 ) THEN                                             42.01
          IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                          42.01
-            ALLOCATE(QTL1(MSC,1))                                         42.01
-            ALLOCATE(QTL2(  0,0))                                         42.01
+            ALLOCATE(QTL1(  0,0))                                         42.01
+            ALLOCATE(QTL2(MSC,2))                                         42.11 42.01
+         ELSE IF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.3) THEN                      42.15 42.01
+            ALLOCATE(QTL1(MSC4D,2))                                       42.15
+            ALLOCATE(QTL2(MSC4D,4))                                       42.15
          ELSE IF (ITRIAD.EQ.5) THEN                                       42.01
             ALLOCATE(QTL1(MSC4D,2))                                       42.01
             ALLOCATE(QTL2(MSC4D,2))                                       42.01
@@ -1408,13 +1411,11 @@
          UYFT  = (0.,0.)
       ENDIF
 !     *** triads ***                                                      42.01
-      IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN                           42.01
-         IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                          42.01
-            QTL1 = 0.                                                     42.01
-         ELSE IF (ITRIAD.EQ.5) THEN                                       42.01
-            QTL1 = 0.                                                     42.01
-            QTL2 = 0.                                                     42.01
-         ENDIF                                                            42.01
+      IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                             42.01
+         QTL2 = 0.                                                        42.01
+      ELSE IF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.3 .OR. ITRIAD.EQ.5) THEN        42.15 42.01
+         QTL1 = 0.                                                        42.01
+         QTL2 = 0.                                                        42.01
       ENDIF                                                               42.01
 
 !----------------------------------------------------------------------   40.31
@@ -2988,7 +2989,7 @@
      &         SWTSDA(MDC,MSC,NPTSTA,MTSVAR)         ,                    40.00
      &         WWAWG(*)                              ,
      &         WWSWG(*)                              ,
-     &         QTL1(MSC4D,*) ,QTL2(MSC4D,2)          ,                    42.01
+     &         QTL1(MSC4D,*) ,QTL2(MSC4D,*)          ,                    42.01
      &         RDX(MICMAX)   ,RDY(MICMAX)            ,                    15/MAY 40.08
      &         OBREDF(MDC,MSC,2)                     ,                    040697
      &         REFLSO(MDC,MSC)                                            40.41
@@ -3434,15 +3435,21 @@
 !       *** fill in the triad interpolation and scaling factors           42.01
 !           for current grid point                                        42.01
 !
-        IF ( ITRIAD.GT.0 .AND. ITRIAD.NE.2 ) THEN                         42.01
-           IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                        42.01
-              QTL1(:,1) = QTRI1(:,KCGRD(1))                               42.01
-           ELSE IF (ITRIAD.EQ.5) THEN                                     42.01
-              QTL1(:,1) = QTRI1(:,1)                                      42.01
-              QTL1(:,2) = QTRI1(:,2)                                      42.01
-              QTL2(:,1) = QTRI2(:,KCGRD(1),1)                             42.01
-              QTL2(:,2) = QTRI2(:,KCGRD(1),2)                             42.01
-           ENDIF                                                          42.01
+        IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                           42.01
+           QTL2(:,1) = QTRI2(:,KCGRD(1),1)                                42.01
+           QTL2(:,2) = QTRI2(:,KCGRD(1),2)                                42.11
+        ELSE IF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.3) THEN                       42.15
+           QTL1(:,1) = QTRI1(:,1)                                         42.15
+           QTL1(:,2) = QTRI1(:,2)                                         42.15
+           QTL2(:,1) = QTRI2(:,KCGRD(1),1)                                42.15
+           QTL2(:,2) = QTRI2(:,KCGRD(1),2)                                42.15
+           QTL2(:,3) = QTRI2(:,KCGRD(1),3)                                42.15
+           QTL2(:,4) = QTRI2(:,KCGRD(1),4)                                42.15
+        ELSE IF (ITRIAD.EQ.5) THEN                                        42.01
+           QTL1(:,1) = QTRI1(:,1)                                         42.01
+           QTL1(:,2) = QTRI1(:,2)                                         42.01
+           QTL2(:,1) = QTRI2(:,KCGRD(1),1)                                42.01
+           QTL2(:,2) = QTRI2(:,KCGRD(1),2)                                42.01
         ENDIF                                                             42.01
 !
 !       *** estimate action density in case of first iteration ***
@@ -4051,28 +4058,34 @@
          WRITE (PRINTF, *) 'Quadruplets is off'
       ENDIF                                                               40.41
       IF (ITRIAD.GT.0) THEN                                               40.41
-         WRITE(PRINTF,9412) ITRIAD, PTRIAD(1)
- 9412    FORMAT(' Triads               : ITRIAD ',I12  ,
+         WRITE(PRINTF,9411) ITRIAD, PTRIAD(1)
+ 9411    FORMAT(' Triads               : ITRIAD ',I12  ,
      &                                 ' TRFAC ',E12.4)
          IF (IBIPH.EQ.1) THEN
             IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                       42.01
-               WRITE(PRINTF,9413) PTRIAD(2), PTRIAD(4)                    41.97 40.41
+               WRITE(PRINTF,9412) PTRIAD(2), PTRIAD(4)                    41.97 40.41
+            ELSEIF (ITRIAD.EQ.3) THEN                                     42.15
+               WRITE(PRINTF,9413) PTRIAD(4)                               42.15
             ELSEIF (ITRIAD.EQ.5) THEN                                     42.01
                WRITE(PRINTF,9414) PTRIAD(2), PTRIAD(4)                    42.01
             ENDIF                                                         42.01
- 9413       FORMAT('                      : CUTFR  ',E12.4,               41.97 40.41
+ 9412       FORMAT('                      : CUTFR  ',E12.4,               41.97 40.41
      &                                    ' URCRI ',E12.4)                41.97 40.41
+ 9413       FORMAT('                      : URCRI  ',E12.4)               42.15
  9414       FORMAT('                      : POWER  ',E12.4,               42.01
      &                                    ' URCRI ',E12.4)                42.01
          ELSE IF (IBIPH.EQ.3) THEN                                        42.01
             IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                       42.01
                WRITE(PRINTF,9513) PTRIAD(2), PTRIAD(9)                    42.01
+            ELSEIF (ITRIAD.EQ.3) THEN                                     42.15
+               WRITE(PRINTF,9514) PTRIAD(9)                               42.15
             ELSEIF (ITRIAD.EQ.5) THEN                                     42.01
-               WRITE(PRINTF,9514) PTRIAD(2), PTRIAD(9)                    42.01
+               WRITE(PRINTF,9515) PTRIAD(2), PTRIAD(9)                    42.01
             ENDIF                                                         42.01
  9513       FORMAT('                      : CUTFR  ',E12.4,               42.01
      &                                    ' LPAR  ',E12.4)                42.01
- 9514       FORMAT('                      : POWER  ',E12.4,               42.01
+ 9514       FORMAT('                      : LPAR   ',E12.4)               42.15
+ 9515       FORMAT('                      : POWER  ',E12.4,               42.01
      &                                    ' LPAR  ',E12.4)                42.01
          ELSE                                                             41.97
             IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                       42.01
@@ -4085,12 +4098,16 @@
          ENDIF                                                            41.97
          WRITE(PRINTF,9417) PTRIAD(5)                                     40.41
  9417    FORMAT(' Minimum Ursell nr for Snl3 :  ',E12.4)                  40.41
-         IF (ITRIAD.EQ.1 .OR. ITRIAD.EQ.11) THEN                          42.01
-            WRITE (PRINTF,*) 'LTA (Eldeberky, 1996) is employed'          42.01
+         IF (ITRIAD.EQ.1) THEN                                            42.11 42.01
+           WRITE (PRINTF,*) 'extended LTA is employed'                    42.11 42.01
          ELSE IF (ITRIAD.EQ.2) THEN                                       42.01
-            WRITE (PRINTF,*) 'SPB (Becq-Girard et al, 1999) is employed'  42.01
+           WRITE (PRINTF,*) 'SPB (Becq-Girard et al, 1999) is employed'   42.01
+         ELSE IF (ITRIAD.EQ.3) THEN                                       42.15
+           WRITE (PRINTF,*) 'FTIM is employed with parametrized biphase'  42.15
          ELSE IF (ITRIAD.EQ.5) THEN                                       42.01
-            WRITE (PRINTF,*) 'DCTA (Booij et al, 2009) is employed'       42.01
+           WRITE (PRINTF,*) 'DCTA (Booij et al, 2009) is employed'        42.01
+         ELSE IF (ITRIAD.EQ.11) THEN                                      42.01
+           WRITE (PRINTF,*) 'LTA (Eldeberky, 1996) is employed'           42.01
          ENDIF                                                            42.01
          IF (ITRIAD.NE.5) THEN                                            42.01
             IF (.NOT.PTRIAD(8).NE.-1.) THEN                               42.01
@@ -4111,13 +4128,30 @@
       ELSE
          WRITE (PRINTF, *) 'Triads is off'
       ENDIF                                                               40.41
-      IF (IBIPH.EQ.1) THEN                                                41.97
-         WRITE (PRINTF,*) 'Biphase based on Eldeberky (1996)'
-      ELSEIF (IBIPH.EQ.2) THEN
-         WRITE (PRINTF,*) 'Biphase based on Saprykina et al. (2017)'
-      ELSEIF (IBIPH.EQ.3) THEN
-         WRITE (PRINTF,*) 'Biphase based on De Wit (2022)'
+      IF (ITRIAD.NE.2) THEN
+         IF (IBIPH.EQ.1) THEN                                             41.97
+            WRITE (PRINTF,*) 'Biphase based on Eldeberky (1996)'
+         ELSEIF (IBIPH.EQ.2) THEN
+            WRITE (PRINTF,*) 'Biphase based on Saprykina et al. (2017)'
+         ELSEIF (IBIPH.EQ.3) THEN
+            WRITE (PRINTF,*) 'Biphase based on De Wit (2022)'
+         ENDIF
       ENDIF
+      IF (ITRIAD.NE.5) THEN
+         IF (PTRIAD(10).EQ.1.) THEN                                       42.15
+            WRITE(PRINTF,8001)                                            42.15
+         ELSEIF (PTRIAD(10).EQ.2.) THEN                                   42.15
+            WRITE(PRINTF,8002)                                            42.15
+         ELSEIF (PTRIAD(10).EQ.3.) THEN                                   42.15
+            WRITE(PRINTF,8003)                                            42.15
+         ELSEIF (PTRIAD(10).EQ.4.) THEN                                   42.15
+            WRITE(PRINTF,8004)                                            42.15
+         ENDIF                                                            42.15
+      ENDIF
+ 8001 FORMAT(' Transfer function based on Freilich and Guza (1984)')      42.15
+ 8002 FORMAT(' Transfer function based on Madsen and Sorensen (1993)')    42.15
+ 8003 FORMAT(' Transfer function based on Bredmose et al (2005)')         42.15
+ 8004 FORMAT(' Transfer function based on Akrish et al (2024)')           42.15
       IF (IBRAG.GT.0) THEN                                                41.80
          WRITE(PRINTF,7019) IBRAG, PBRAG(2)
  7019    FORMAT(' Bragg scattering     : IBRAG  ',I12  ,
@@ -7233,7 +7267,7 @@
       REAL  :: NPLA2(MCGRD)                                               40.55
       REAL  :: TURBV2(MCGRD)                                              40.35
       REAL  :: MUDL2(MCGRD)                                               40.59
-      REAL  :: QTL1(MSC4D,*), QTL2(MSC4D,2)                               42.01
+      REAL  :: QTL1(MSC4D,*), QTL2(MSC4D,*)                               42.01
       REAL, INTENT(IN)  :: AICE2(MCGRD)                                   41.75
       REAL, INTENT(IN)  :: HICE2(MCGRD)                                   41.75
       REAL  :: REFLSO(MDC,MSC)                                            40.41
@@ -7519,16 +7553,17 @@
 !
            IF (ITRIAD.EQ.1.OR.ITRIAD.EQ.11) THEN
 !             LTA
-              CALL SWLTA ( AC2   , DEP2  , SPCSIG,                        40.56
+              CALL SWLTA ( AC2   , DEP2  , CGO   , SPCSIG,                40.56
      &                     IMATRA, IMATDA, REDC0 , REDC1 ,                40.85
      &                     IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                     SMEBRK, PLTRI , URSELL, BIPHAS, QTL1  )
-           ELSEIF (ITRIAD.EQ.2) THEN
-!             SPB
-              CALL SWSPB (AC2   , DEP2  , CGO   , SPCSIG,
-     &                    KWAVE , IMATRA, IMATDA, REDC0 , REDC1 ,
-     &                    IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                    PLTRI )
+     &                     SMEBRK, PLTRI , URSELL, BIPHAS, QTL2  )
+           ELSEIF (ITRIAD.EQ.2 .OR. ITRIAD.EQ.3) THEN                     42.15
+!             SPB or FTIM
+              CALL SWFTIM ( AC2   , SPCSIG,
+     &                      IMATRA, IMATDA, REDC0 , REDC1 ,
+     &                      IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
+     &                      PLTRI , URSELL, BIPHAS,
+     &                      QTL1  , QTL2  )
            ELSEIF (ITRIAD.EQ.5) THEN
 !             DCTA
               IF ( TCOLL ) THEN

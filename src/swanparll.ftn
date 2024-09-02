@@ -4619,7 +4619,7 @@
 !
       USE OCPCOMM4                                                        40.41
       USE SWCOMM1                                                         40.41
-      USE SWCOMM2, ONLY: OPTG                                             41.36
+      USE SWCOMM2, ONLY: OPTG, XOFFS, YOFFS                               43.01 41.36
       USE SWCOMM3                                                         40.41
       USE SWCOMM4                                                         40.41
       USE OUTP_DATA
@@ -4888,8 +4888,8 @@
                END DO
             ELSE
                DO IP = 1, MIP
-                  WRITE (NREF, FMT=CRFORM) DBLE(xcugrdgl(IP)),
-     &                                     DBLE(ycugrdgl(IP))
+                  WRITE (NREF, FMT=CRFORM) DBLE(xcugrdgl(IP)+XOFFS),      43.01
+     &                                     DBLE(ycugrdgl(IP)+YOFFS)       43.01
                ENDDO
             ENDIF
 

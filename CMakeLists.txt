@@ -16,7 +16,7 @@ endif()
 project( SWAN Fortran )
 
 # set the SWAN version
-set( VERSION 41.45 )
+set( VERSION 41.51 )
 
 # enable common build
 set( CMAKE_BUILD_TYPE None CACHE STRING "" FORCE )

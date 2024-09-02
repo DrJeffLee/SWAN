@@ -92,10 +92,6 @@ subroutine SwanBndStruc ( xcgrid, ycgrid )
 !
     if (ltrace) call strace (ient,'SwanBndStruc')
     !
-    ! if list of boundary vertices is already filled, return
-    !
-    if ( LBV ) return
-    !
     if (.not.allocated(xbnd)) allocate (xbnd(1:2*(mxc+myc-2)))
     if (.not.allocated(ybnd)) allocate (ybnd(1:2*(mxc+myc-2)))
     ibnd = 0
@@ -223,8 +219,5 @@ subroutine SwanBndStruc ( xcgrid, ycgrid )
     else
       call MSGERR(1,'No output points found in '//psname)
     endif
-    !
-    ! prevents second entry into this subroutine
-    LBV = .TRUE.
     !
 end subroutine SwanBndStruc
