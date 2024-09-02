@@ -59,7 +59,7 @@ module SwanGridobjects
     integer, parameter :: MINVERTCELL = 4   ! mininum number of cells around a vertex
     integer, parameter :: MAXVERTCELL = 10  ! maximum number of cells around a vertex
     !
-    integer, parameter :: MAXVERTATTI = 7   ! maximum number of attributes of type integer
+    integer, parameter :: MAXVERTATTI = 6   ! maximum number of attributes of type integer
                                             ! in data structure of vertices
     integer, parameter :: VERTID  = 1       ! identification number
     integer, parameter :: VMARKER = 2       ! boundary marker for vertices
@@ -70,8 +70,7 @@ module SwanGridobjects
                                             ! vert(j)%atti(VBC) = 0 is a vertex where no b.c. is given
     integer, parameter :: VERTF1  = 4       ! first face connecting to present vertex
     integer, parameter :: VERTF2  = 5       ! second face connecting to present vertex
-    integer, parameter :: BINDX   = 6       ! indices for boundary points in ascending order
-    integer, parameter :: BPOL    = 7       ! sequence number of boundary polygons
+    integer, parameter :: BPOL    = 6       ! sequence number of boundary polygons
     !
     integer, parameter :: MAXVERTATTR = 2   ! maximum number of attributes of type real
                                             ! in data structure of vertices

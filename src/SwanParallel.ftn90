@@ -338,12 +338,12 @@ subroutine SwanMeshPartition
     ! allocate data for mesh partitioning
     !
     istat = 0
-    if (                   .not.allocated(xadj  ) ) allocate(xadj  (1+nv), stat = istat)
-    if (  istat == 0 .and. .not.allocated(vwgt  ) ) allocate(vwgt  (  nv), stat = istat)
-    if (  istat == 0 .and. .not.allocated(vsize ) ) allocate(vsize (  nv), stat = istat)
-    if (  istat == 0 .and. .not.allocated(tpwgts) ) allocate(tpwgts(  np), stat = istat)
-    if (  istat == 0 .and. .not.allocated(nfacev) ) allocate(nfacev(  nv), stat = istat)
-    if (  istat == 0 .and. .not.allocated(vneigh) ) allocate(vneigh(  nv), stat = istat)
+    if (                  .not.allocated(xadj  ) ) allocate(xadj  (1+nv), stat = istat)
+    if ( istat == 0 .and. .not.allocated(vwgt  ) ) allocate(vwgt  (  nv), stat = istat)
+    if ( istat == 0 .and. .not.allocated(vsize ) ) allocate(vsize (  nv), stat = istat)
+    if ( istat == 0 .and. .not.allocated(tpwgts) ) allocate(tpwgts(  np), stat = istat)
+    if ( istat == 0 .and. .not.allocated(nfacev) ) allocate(nfacev(  nv), stat = istat)
+    if ( istat == 0 .and. .not.allocated(vneigh) ) allocate(vneigh(  nv), stat = istat)
     !
     ne     = 0
     nfacev = 0
@@ -368,9 +368,9 @@ subroutine SwanMeshPartition
     !
     ! allocate remaining data for mesh partitioning
     !
-    if (  istat == 0 .and. .not.allocated(adjncy) ) allocate(adjncy(      ne), stat = istat)
-    if (  istat == 0 .and. .not.allocated(adjw  ) ) allocate(adjw  (      ne), stat = istat)
-    if (  istat == 0 .and. .not.allocated(covts ) ) allocate(covts (maxfv,nv), stat = istat)
+    if ( istat == 0 .and. .not.allocated(adjncy) ) allocate(adjncy(      ne), stat = istat)
+    if ( istat == 0 .and. .not.allocated(adjw  ) ) allocate(adjw  (      ne), stat = istat)
+    if ( istat == 0 .and. .not.allocated(covts ) ) allocate(covts (maxfv,nv), stat = istat)
     !
     if ( istat /= 0 ) then
        write (msgstr, '(a,i6)') 'allocation problem: mesh partitioning data and return code is ',istat
@@ -595,7 +595,6 @@ subroutine SwanCommAdmin
 !
 !   Modules used
 !
-    use swcomm2
     use ocpcomm4
     use m_parall
     use SwanGriddata
@@ -618,6 +617,7 @@ subroutine SwanCommAdmin
     integer                                :: ip2      ! subdomain number of second vertex
     integer                                :: ip3      ! subdomain number of third vertex
     integer                                :: istat    ! indicate status of allocation
+    integer, dimension(1)                  :: itmp     ! temporary stored integer
     integer                                :: ivert    ! global vertex index
     integer                                :: j        ! loop counter
     integer                                :: jvert    ! local vertex index
@@ -682,8 +682,8 @@ subroutine SwanCommAdmin
     if (ltrace) call strace (ient,'SwanCommAdmin')
     !
     istat = 0
-    if (                   .not.allocated(jlist ) ) allocate(jlist (nov*ncellsg), stat = istat)
-    if (  istat == 0 .and. .not.allocated(ivertl) ) allocate(ivertl(    nvertsg), stat = istat)
+    if (                  .not.allocated(jlist ) ) allocate(jlist (nov*ncellsg), stat = istat)
+    if ( istat == 0 .and. .not.allocated(ivertl) ) allocate(ivertl(    nvertsg), stat = istat)
     !
     if ( istat /= 0 ) then
        write (msgstr, '(a,i6)') 'allocation problem: comm administration data and return code is ',istat
@@ -943,9 +943,10 @@ subroutine SwanCommAdmin
        icell = clistlg(j,INODE)
        do k = 1, nov
           ivert = kvertc(k,icell)
-          call locate(jlist,nverts,ivert,jvert)
-          if ( jlist(jvert+1) == ivert ) then
-             kvtcp(k,j) = jvert+1
+          itmp  = minloc(abs(jlist-ivert))
+          jvert = itmp(1)
+          if ( jlist(jvert) == ivert ) then
+             kvtcp(k,j) = jvert
           else
              write (msgstr,'(a,i7,a,i7)') 'inconsistency found in SwanCommAdmin: list local-to-global vertex-based list corrupt!'
              call msgerr ( 4, trim(msgstr) )
@@ -960,31 +961,19 @@ subroutine SwanCommAdmin
     allocate(kvertc(3,ncells))
     kvertc = kvtcp
     !
-    ! create copies of parts of xcugrd, ycugrd and vmark for each subdomain
+    ! create copy of parts of vmark for each subdomain
     !
-    if (.not.allocated(xcugrdgl)) allocate(xcugrdgl(nvertsg))
-    if (.not.allocated(ycugrdgl)) allocate(ycugrdgl(nvertsg))
-    xcugrdgl = xcugrd
-    ycugrdgl = ycugrd
     ! use array ivertl to store vmark temporarily
     ivertl = vmark
-    deallocate(xcugrd,ycugrd,vmark)
-    allocate(xcugrd(nverts))
-    allocate(ycugrd(nverts))
-    allocate(vmark (nverts))
+    deallocate(vmark)
+    allocate(vmark(nverts))
     !
     do jvert = 1, nverts
        ivert = ivertg(jvert)
-       xcugrd(jvert) = xcugrdgl(ivert)
-       ycugrd(jvert) = ycugrdgl(ivert)
-       vmark (jvert) = ivertl  (ivert)
-       ! ghost vertices are marked with +999
-       if ( .not.vres(jvert) ) vmark(jvert) = 999
+       vmark(jvert) = ivertl(ivert)
+       ! ghost vertices are marked with exception value
+       if ( .not.vres(jvert) ) vmark(jvert) = excmark
     enddo
-    !
-    ! to be used during post-processing
-    xcugrdgl = xcugrdgl + XOFFS
-    ycugrdgl = ycugrdgl + YOFFS
     !
     ! allocate arrays for MPI communication
     !
@@ -1319,6 +1308,352 @@ subroutine SwanUvExchgR ( fld )
     !
 end subroutine SwanUvExchgR
 !
+subroutine SwanCollBpntlist
+!
+!   --|-----------------------------------------------------------|--
+!     | Delft University of Technology                            |
+!     | Faculty of Civil Engineering and Geosciences              |
+!     | Environmental Fluid Mechanics Section                     |
+!     | P.O. Box 5048, 2600 GA  Delft, The Netherlands            |
+!     |                                                           |
+!     | Programmer: Marcel Zijlema                                |
+!   --|-----------------------------------------------------------|--
+!
+!
+!     SWAN (Simulating WAves Nearshore); a third generation wave model
+!     Copyright (C) 1993-2024  Delft University of Technology
+!
+!     This program is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+!
+!     This program is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+!     GNU General Public License for more details.
+!
+!     You should have received a copy of the GNU General Public License
+!     along with this program. If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!   Authors
+!
+!   43.01: Marcel Zijlema
+!
+!   Updates
+!
+!   43.01, August 2024: New subroutine
+!
+!   Purpose
+!
+!   Gathers the lists of boundary points in the ascending order from each processor to all the processes
+!
+!   Modules used
+!
+!MPI    use mpi
+    use ocpcomm4
+    use m_parall
+    use SwanGriddata
+    use SwanCompdata
+!
+    implicit none
+!
+!   Local variables
+!
+    integer, dimension(:)  , allocatable :: blistg   ! list of unordered boundary vertices in global grid
+    integer, dimension(:)  , allocatable :: bmarkg   ! list of corresponding boundary markers in global grid
+    integer                              :: i        ! loop counter
+    integer, dimension(:)  , allocatable :: iarr1    ! temporary array to store genuine global boundary indices
+    integer, dimension(:)  , allocatable :: iarr2    ! temporary array to store corresponding boundary markers
+    integer, dimension(:)  , allocatable :: iarr3    ! temporary array to store corresponding sequence number of boundary polygons
+    integer, dimension(:)  , allocatable :: iarrg1   ! same as iarr1 but global
+    integer, dimension(:)  , allocatable :: iarrg2   ! same as iarr2 but global
+    integer, dimension(:)  , allocatable :: iarrg3   ! same as iarr3 but global
+    integer, dimension(:)  , allocatable :: icount   ! array specifying array size of data received from each processor
+    integer, dimension(:)  , allocatable :: idsplc   ! array specifying the starting address of the incoming data from
+                                                     ! each processor, relative to the global array
+    integer, save                        :: ient = 0 ! number of entries in this subroutine
+!MPI    integer                              :: ierr     ! error value of MPI call
+    integer                              :: ii       ! help index
+    integer                              :: istat    ! indicate status of allocation
+    integer                              :: itmp     ! temporary stored integer for swapping
+    integer                              :: j        ! loop counter
+    integer, dimension(:)  , allocatable :: jlist    ! list of ascending order of boundary indices
+    integer                              :: k        ! counter
+    integer, dimension(1)                :: kd       ! location of minimum value in array ang
+    integer                              :: maxnbp   ! maximum number of boundary vertices in set of polygons
+    integer                              :: nbp      ! number of boundary vertices in present boundary polygon
+    integer                              :: nbptot   ! total number of boundary vertices
+    integer                              :: nbpgl    ! number of boundary vertices in global grid
+    integer                              :: nbpolgl  ! number of boundary polygons in global grid
+    !
+    real   , dimension(:)  , allocatable :: ang      ! angle of boundary points with respect to centroid
+    real   , dimension(:)  , allocatable :: dxc      ! distance in x-direction with respect to centroid
+    real   , dimension(:)  , allocatable :: dyc      ! distance in y-direction with respect to centroid
+    real                                 :: rtmp     ! temporary stored real for swapping
+    real                                 :: sumx     ! sum of all x-coordinates of boundary points
+    real                                 :: sumy     ! sum of all y-coordinates of boundary points
+    real                                 :: xc       ! x-coordinate of centroid
+    real                                 :: yc       ! y-coordinate of centroid
+    !
+!MPI    character(120)                       :: msgstr   ! string to pass message
+!
+!   Structure
+!
+!   Description of the pseudo code
+!
+!   for each boundary polygon do
+!       complete the list of genuine boundary points and scatter to all processes
+!       re-order this list counterclockwise
+!
+    if (ltrace) call strace (ient,'SwanCollBpntlist')
+    !
+    ! if not parallel, return
+    !
+    if ( .not.PARLL ) return
+    !
+    allocate(icount(0:NPROC-1))
+    allocate(idsplc(0:NPROC-1))
+    !
+    maxnbp = size(blist) / nbpol
+    !
+    nbptot = maxnbp * nbpol
+    !
+    ! store the global indices, markers and polygon sequence number of genuine boundary points
+    !
+    allocate(iarr1(nbptot))
+    allocate(iarr2(nbptot))
+    allocate(iarr3(nbptot))
+    !
+    k = 0
+    !
+    do j = 1, nbpol
+       !
+       do i = 1, maxnbp
+          !
+          ii = blist(i,j)
+          !
+          if ( ii > 0 .and. vmark(ii) < excmark ) then
+             k = k + 1
+             iarr1(k) = ivertg(ii)
+             iarr2(k) = vmark (ii)
+             iarr3(k) = j
+             !
+          endif
+          !
+       enddo
+       !
+    enddo
+    !
+    deallocate( blist )
+    !
+    nbptot = k
+    !
+    ! calculate the global size as sum of the local sizes
+    !
+!MPI    call MPI_ALLREDUCE ( nbptot, nbpgl, 1, SWINT, SWSUM, MPI_COMM_WORLD, ierr )
+!MPI    if ( ierr /= MPI_SUCCESS ) then
+!MPI       write (msgstr, '(a,i3,a,i4)') 'MPI produces some internal error - return code is ',ierr,' and node number is ',INODE
+!MPI       call msgerr ( 4, trim(msgstr) )
+!MPI       return
+!MPI    endif
+    !
+    ! allocate temporary global data
+    !
+    istat = 0
+    if (                  .not.allocated(iarrg1) ) allocate (iarrg1(nbpgl), stat = istat)
+    if ( istat == 0 .and. .not.allocated(iarrg2) ) allocate (iarrg2(nbpgl), stat = istat)
+    if ( istat == 0 .and. .not.allocated(iarrg3) ) allocate (iarrg3(nbpgl), stat = istat)
+    if ( istat /= 0 ) then
+       call msgerr ( 4, 'Allocation problem in SwanCollBpntlist: temporary global data ' )
+       return
+    endif
+    !
+    ! gather the array sizes to all the processes
+    !
+!MPI    call MPI_ALLGATHER ( nbptot, 1, SWINT, icount, 1, SWINT, MPI_COMM_WORLD, ierr )
+!MPI    if ( ierr /= MPI_SUCCESS ) then
+!MPI       write (msgstr, '(a,i3,a,i4)') 'MPI produces some internal error - return code is ',ierr,' and node number is ',INODE
+!MPI       call msgerr ( 4, trim(msgstr) )
+!MPI       return
+!MPI    endif
+    !
+    ! calculate starting address of each local array with respect to the global array
+    !
+    idsplc(0) = 0
+    do i = 1, NPROC-1
+       idsplc(i) = icount(i-1) + idsplc(i-1)
+    enddo
+    !
+    ! gather blist from each processor to all the processes
+    !
+!MPI    call MPI_ALLGATHERV ( iarr1(1:nbptot), nbptot, SWINT, iarrg1, icount, idsplc, SWINT, MPI_COMM_WORLD, ierr )
+!MPI    if ( ierr /= MPI_SUCCESS ) then
+!MPI       write (msgstr, '(a,i3,a,i4)') 'MPI produces some internal error - return code is ',ierr,' and node number is ',INODE
+!MPI       call msgerr ( 4, trim(msgstr) )
+!MPI       return
+!MPI    endif
+    !
+    ! gather corresponding markers from each processor to all the processes
+    !
+!MPI    call MPI_ALLGATHERV ( iarr2(1:nbptot), nbptot, SWINT, iarrg2, icount, idsplc, SWINT, MPI_COMM_WORLD, ierr )
+!MPI    if ( ierr /= MPI_SUCCESS ) then
+!MPI       write (msgstr, '(a,i3,a,i4)') 'MPI produces some internal error - return code is ',ierr,' and node number is ',INODE
+!MPI       call msgerr ( 4, trim(msgstr) )
+!MPI       return
+!MPI    endif
+    !
+    ! gather corresponding polygon sequence number from each processor to all the processes
+    !
+!MPI    call MPI_ALLGATHERV ( iarr3(1:nbptot), nbptot, SWINT, iarrg3, icount, idsplc, SWINT, MPI_COMM_WORLD, ierr )
+!MPI    if ( ierr /= MPI_SUCCESS ) then
+!MPI       write (msgstr, '(a,i3,a,i4)') 'MPI produces some internal error - return code is ',ierr,' and node number is ',INODE
+!MPI       call msgerr ( 4, trim(msgstr) )
+!MPI       return
+!MPI    endif
+    !
+    deallocate ( iarr1, iarr2, iarr3, icount, idsplc )
+    !
+    ! determine maximum number of boundary polygons in global grid
+    !
+    nbpolgl = maxval(iarrg3)
+    !
+    ! determine maximum number of boundary vertices in set of polygons
+    !
+    maxnbp = -999
+    !
+    do j = 1, nbpolgl
+       nbp = count(mask=iarrg3==j)
+       if ( nbp > maxnbp ) maxnbp = nbp
+    enddo
+    !
+    ! allocate and initialize blist and bmark
+    !
+    istat = 0
+    if (                  .not.allocated(blist) ) allocate (blist(maxnbp,nbpolgl), stat = istat)
+    if ( istat == 0 .and. .not.allocated(bmark) ) allocate (bmark(maxnbp,nbpolgl), stat = istat)
+    if ( istat /= 0 ) then
+       call msgerr ( 4, 'Allocation problem in SwanCollBpntlist: array blist and bmark ' )
+       return
+    endif
+    !
+    blist = 0
+    bmark = 0
+    !
+    ! allocate global data to store unordered boundary indices and corresponding markers
+    !
+    istat = 0
+    if (                  .not.allocated(blistg) ) allocate (blistg(nbpgl), stat = istat)
+    if ( istat == 0 .and. .not.allocated(bmarkg) ) allocate (bmarkg(nbpgl), stat = istat)
+    if ( istat /= 0 ) then
+       call msgerr ( 4, 'Allocation problem in SwanCollBpntlist: array blistg and bmarkg ' )
+       return
+    endif
+    !
+    blistg = 0
+    bmarkg = 0
+    !
+    ! complete the list of genuine boundary vertices in ascending order for all boundary polygons
+    !
+    do j = 1, nbpolgl
+       !
+       k = 0
+       !
+       do i = 1, nbpgl
+          !
+          if ( iarrg3(i) == j ) then
+             !
+             k = k + 1
+             !
+             blistg(k) = iarrg1(i)
+             bmarkg(k) = iarrg2(i)
+             !
+          endif
+          !
+       enddo
+       !
+       nbp = k
+       !
+       ! allocate data for computing the order of boundary points
+       !
+       istat = 0
+       if (                  .not.allocated(ang  ) ) allocate (ang  (nbp), stat = istat)
+       if ( istat == 0 .and. .not.allocated(dxc  ) ) allocate (dxc  (nbp), stat = istat)
+       if ( istat == 0 .and. .not.allocated(dyc  ) ) allocate (dyc  (nbp), stat = istat)
+       if ( istat == 0 .and. .not.allocated(jlist) ) allocate (jlist(nbp), stat = istat)
+       if ( istat /= 0 ) then
+          call msgerr ( 4, 'Allocation problem in SwanCollBpntlist: array ang, dxc, dyc and jlist ' )
+          return
+       endif
+       !
+       ! first determine centroid
+       !
+       sumx = 0.
+       sumy = 0.
+       do i = 1, nbp
+          ii = blistg(i)
+          sumx = sumx + xcugrdgl(ii)
+          sumy = sumy + ycugrdgl(ii)
+       enddo
+       !
+       xc = sumx / real(nbp)
+       yc = sumy / real(nbp)
+       !
+       do i = 1, nbp
+          ii = blistg(i)
+          dxc(i) = xcugrdgl(ii) - xc
+          dyc(i) = ycugrdgl(ii) - yc
+       enddo
+       !
+       ! determine angle of each boundary point with respect to centroid
+       !
+       ang(:) = atan2( dyc(:), dxc(:) )
+       !
+       ! sort angles counterclockwise
+       !
+       do i = 1, nbp
+          jlist(i) = i
+       enddo
+       !
+       do i = 1, nbp-1
+          !
+          kd = minloc(ang(i:nbp))
+          k  = kd(1) + i-1
+          !
+          if ( k /= i ) then
+             !
+             rtmp   = ang(i)
+             ang(i) = ang(k)
+             ang(k) = rtmp
+             !
+             itmp     = jlist(i)
+             jlist(i) = jlist(k)
+             jlist(k) = itmp
+             !
+          endif
+          !
+       enddo
+       !
+       ! sort blist and corresponding markers accordingly
+       !
+       do i = 1, nbp
+          blist(i,j) = blistg(jlist(i))
+          bmark(i,j) = bmarkg(jlist(i))
+       enddo
+       !
+       ! store number of boundary vertices for present polygon
+       !
+       nbpt(j) = nbp
+       !
+       deallocate( ang, dxc, dyc, jlist )
+       !
+    enddo
+    !
+    deallocate( iarrg1, iarrg2, iarrg3, blistg, bmarkg )
+    !
+end subroutine SwanCollBpntlist
+!
 subroutine hpsort ( n, ia )
 !
 !     SWAN (Simulating WAves Nearshore); a third generation wave model
@@ -1407,86 +1742,5 @@ subroutine hpsort ( n, ia )
     go to 10
     !
 end subroutine hpsort
-!
-subroutine locate ( ia, n, a, j )
-!
-!     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2024  Delft University of Technology
-!
-!     This program is free software: you can redistribute it and/or modify
-!     it under the terms of the GNU General Public License as published by
-!     the Free Software Foundation, either version 3 of the License, or
-!     (at your option) any later version.
-!
-!     This program is distributed in the hope that it will be useful,
-!     but WITHOUT ANY WARRANTY; without even the implied warranty of
-!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-!     GNU General Public License for more details.
-!
-!     You should have received a copy of the GNU General Public License
-!     along with this program. If not, see <http://www.gnu.org/licenses/>.
-!
-!
-!   Purpose
-!
-!   Given an array IA of length N, and given a value A, returns a value J such that IA(J) < A <= IA(J+1)
-!
-!   Method
-!
-!   The routine is copied from: Press et al., Numerical Recipes
-!
-!   array IA must be monotonic, either increasing or decreasing
-!   J = 0 or J = N+1 is returned to indicate that A is out of range
-!
-!   Modules used
-!
-    use ocpcomm4, only: ltrace
-!
-    implicit none
-!
-!   Argument variables
-!
-    integer,               intent(in ) :: a  ! a given value
-    integer,               intent(out) :: j  ! location to be found
-    integer,               intent(in ) :: n  ! size of array
-    integer, dimension(n), intent(in ) :: ia ! given array
-!
-!   Local variables
-!
-    integer, save :: ient = 0 ! number of entries in this subroutine
-    integer       :: jm       ! midpoint
-    integer       :: jl       ! lower limit
-    integer       :: ju       ! upper limit
-!
-!   Source text
-!
-    if (ltrace) call strace (ient,'locate')
-    !
-    ! initialize lower and upper limits
-    !
-    jl = 0
-    ju = n+1
-    !
-    ! if we are not done yet, compute a midpoint, and replace either the lower limit or the upper limit, as appropriate
-    !
- 10 if ( ju-jl > 1 ) then
-       jm = (ju+jl)/2
-       if ( ( ia(n) > ia(1) ) .eqv. ( a > ia(jm) ) ) then
-          jl = jm
-       else
-          ju = jm
-       endif
-       !
-       ! repeat until the test condition 10 is satisfied
-       go to 10
-    endif
-    !
-    ! then set the output and return
-    !
-    j = jl
-    !
-    return
-    !
-end subroutine locate
 !
 end module SwanParallel

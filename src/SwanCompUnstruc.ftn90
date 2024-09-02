@@ -583,11 +583,11 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
 !TIMG    call SWTSTO(135)
     !$omp end single
     !
-    ! store frequency- and space-dependent data for LTA/DCTA
+    ! store frequency- and space-dependent data for triads
     !
     !$omp single
 !TIMG    call SWTSTA(134)
-    if ( ITRIAD > 0 .and. ITRIAD /= 2 ) then
+    if ( ITRIAD > 0 ) then
        if ( it == 1 .or. DYNDEP ) call FAC3WW ( compda(1,JDP2), spcsig )
     endif
 !TIMG    call SWTSTO(134)
@@ -629,10 +629,13 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
        allocate(dsnl(0,0))
     endif
     !
-    if ( ITRIAD > 0 .and. ITRIAD /= 2 ) then
+    if ( ITRIAD > 0 ) then
        if (ITRIAD == 1 .or. ITRIAD == 11) then
-          allocate(qtl1(MSC,1))
-          allocate(qtl2(  0,0))
+          allocate(qtl1(  0,0))
+          allocate(qtl2(MSC,2))
+       else if (ITRIAD == 2 .or. ITRIAD == 3) then
+          allocate(qtl1(MSC4D,2))
+          allocate(qtl2(MSC4D,4))
        else if (ITRIAD == 5) then
           allocate(qtl1(MSC4D,2))
           allocate(qtl2(MSC4D,2))
@@ -1110,15 +1113,21 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
                          !
                          ! fill in the triad interpolation and scaling factors for current grid point
                          !
-                         if ( ITRIAD > 0 .and. ITRIAD /= 2 ) then
-                            if (ITRIAD == 1 .or. ITRIAD == 11) then
-                               qtl1(:,1) = qtri1(:,KCGRD(1))
-                            else if (ITRIAD == 5) then
-                               qtl1(:,1) = qtri1(:,1)
-                               qtl1(:,2) = qtri1(:,2)
-                               qtl2(:,1) = qtri2(:,KCGRD(1),1)
-                               qtl2(:,2) = qtri2(:,KCGRD(1),2)
-                            endif
+                         if (ITRIAD == 1 .or. ITRIAD == 11) then
+                            qtl2(:,1) = qtri2(:,KCGRD(1),1)
+                            qtl2(:,2) = qtri2(:,KCGRD(1),2)
+                         else if (ITRIAD == 2 .or. ITRIAD == 3) then
+                            qtl1(:,1) = qtri1(:,1)
+                            qtl1(:,2) = qtri1(:,2)
+                            qtl2(:,1) = qtri2(:,KCGRD(1),1)
+                            qtl2(:,2) = qtri2(:,KCGRD(1),2)
+                            qtl2(:,3) = qtri2(:,KCGRD(1),3)
+                            qtl2(:,4) = qtri2(:,KCGRD(1),4)
+                         else if (ITRIAD == 5) then
+                            qtl1(:,1) = qtri1(:,1)
+                            qtl1(:,2) = qtri1(:,2)
+                            qtl2(:,1) = qtri2(:,KCGRD(1),1)
+                            qtl2(:,2) = qtri2(:,KCGRD(1),2)
                          endif
                          !
                          ! compute the source terms

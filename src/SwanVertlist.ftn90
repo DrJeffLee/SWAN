@@ -120,8 +120,8 @@ subroutine SwanVertlist ( compda )
           k     = 0
           wdsum = 0.
           do j = 1, nverts
-!            internal vertices and ghost vertices only
-             if ( vmark(j) == 0 .or. vmark(j) == 999 ) then
+!            internal vertices, exception vertices and ghost vertices only
+             if ( vmark(j) == 0 .or. vmark(j) >= excmark ) then
                 wx = compda(j,JWX2)
                 wy = compda(j,JWY2)
                 if ( wx /= 0. .or. wy /= 0. ) then

@@ -38,18 +38,16 @@
 !
 !     *** nonlinear 3 wave-wave interactions ***
 !
-!     TCOEF   (compute coupling coefficients for SPB of Becq-Girard et al, 1999)
-!     COAPP   (interpolation of energy densities at sum and diff freqs for triads)
-!     FAC3WW  (compute scaling factors for LTA/DCTA)
+!     TCOEF   (compute transfer coefficients)
+!     FAC3WW  (compute scaling factors for the triad-wave interaction)
 !     SWLTA   (triad-wave interactions calculated with the Lumped Triad
 !              Approximation of Eldeberky, 1996)
-!     SWSPB   (triad-wave interactions calculated with the Stochastic
-!              Parametric model based on the Boussinesq eqs (SPB) of
-!              Becq-Girard et al, 1999)
 !     SWDCTA  (triad-wave interactions calculated with the Distributed
 !              Collinear Triad Approximation of Booij et al, 2009)
 !     SWDNCTA (triad-wave interactions calculated with the Distributed
 !              NonCollinear Triad Approximation)
+!     SWFTIM  (triad-wave interactions calculated using the full integration
+!              and the parametrized bispectrum)
 !     PEREXC  (includes periodic exchange between first and second harmonics
 !              for estimating biphase based on Saprykina et al, 2017)
 !     SWBIDW  (compute the biphase based on the parametrization of De Wit, 2022)
@@ -2998,14 +2996,14 @@
 !
 !********************************************************************
 !
-      SUBROUTINE TCOEF (W1, W2, W12, K1, K2, K12, DEP2, R, S, ICC)
+      SUBROUTINE TCOEF ( W1, W2, W12, K1, K2, K12, DEP, R, S )
 !
 !********************************************************************
 !
+      USE OCPCOMM4
       USE SWCOMM3
 
       IMPLICIT NONE
-!
 !
 !
 !   --|-----------------------------------------------------------|--
@@ -3038,16 +3036,21 @@
 !  0. Authors
 
 !     41.46: James Salmon
+!     42.11: Gal Akrish
 
 !  1. Updates
 
 !     41.46, October 2013: new subroutine
+!     42.11,   April 2024: interaction coeff QuadWave included
 
 !  2. Purpose
 !
-!     Calculates coupling coefficients
+!     Calculates transfer coefficients
 !
 !  3. Method
+!
+!     deterministic Boussinesq model of Madsen and Sorensen (1993)
+!     (Eqs. 5.4a and 5.4f):
 !
 !     R_m,p-m = (k_m + k_p-m)^2 * [0.5 + (w_m*w_p-m / g*h*k_m*k_p-m)]
 !
@@ -3055,39 +3058,60 @@
 !
 !     where: B = 1/15
 !
+!     See also Becq-Girard et al (1999), Eqs. 2.5 and 2.6
+!     Further details can be found in Akrish et al (2024), Eqs. (13)-(15)
+!     and Appendix A
+!
 !  4. Argument variables
 !
-!     ICC         type of coupling coefficient
-!          [1]  - Boussinesq: Freilich & Guza (1984), Herbers & Burton (1997)
-!          [2]  - Deterministic Boussinesq: Madsen & Sorensen (1993); suggested for SPB
+!     DEP         water depth
+!     R           numerator of transfer function
+!     S           denominator of transfer function
 !
-!     W1, W2, W12 w_p, w_m, w_I
-!     K1, K2, K12 k_p, k_m, k_I      where I represents the sum or difference
-!     DEP2        water depth
-!
-      INTEGER ICC
+!     W1, W2, W12 w_p, w_m, w_I      where I represents the sum or difference, i.e.
+!     K1, K2, K12 k_p, k_m, k_I      I=p-m and I=p+m, respectively
 !
       REAL :: W1, W2, W12
       REAL :: K1, K2, K12
 !
-      REAL :: DEP2(MCGRD)
+      REAL :: DEP
 !
       REAL, INTENT(OUT) :: R
       REAL, INTENT(OUT) :: S
 !
-!     Values from common
+!  5. Parameter variables
+!
+!     A1          first optimization parameter for QuadWave1D
+!     A2          second optimization parameter for QuadWave1D
+!     A3          third optimization parameter for QuadWave1D
+!
+!     Note: these optimization parameters minimize the error in nonlinearity
+!           while maintaining the dispersion properties of the Bredmose et al (2005)
+!           model
+!
+      REAL, PARAMETER :: A1 = 1.
+      REAL, PARAMETER :: A2 = 0.4  ! note: original value of 1.4 yields too much
+                                   !       energy in high-frequency part
+      REAL, PARAMETER :: A3 = 5.5
 !
 !  6. Local variables
 !
-      REAL :: DEP , DEP_2, DEP_3
-      REAL :: B   , B2   , B3
-      REAL :: KPROD
+!     ITRF  : indicates type of transfer function for triad interaction
+!             =1; classic Boussinesq: Freilich and Guza (1984), Herbers and Burton (1997)
+!             =2; deterministic Boussinesq of Madsen and Sorensen (1993)
+!             =3; exact second order transfer coefficient of Bredmose et al (2005)
+!             =4; QuadWave of Akrish et al (2024)
+!
+      INTEGER :: IENT, ITRF
+      REAL    :: DEP_2, DEP_3
+      REAL    :: B, B2, B3
+      REAL    :: PROD, KLM, WLM2, FAC1, FAC2
 !
 !  7. SUBROUTINES USED
 
 !  8. SUBROUTINES CALLING
 
-!     SWSPB
+!     ---
 
 !  9. ERROR MESSAGES
 
@@ -3099,380 +3123,60 @@
 
 ! 11. STRUCTURE
 
-!     -----------------------------------------------------------------
-
-!     -----------------------------------------------------------------
+!     ---
 
 ! 13. Source text
 !
-      DEP   = DEP2(KCGRD(1))
+      SAVE IENT
+      DATA IENT/0/
+      IF (LTRACE) CALL STRACE (IENT,'TCOEF')
+!
+      R = 0.
+      S = 1.
+      IF (.NOT.W1.NE.0. .OR. .NOT.K1.NE.0.) RETURN
+!
+      ITRF = INT(PTRIAD(10))
+!
       DEP_2 = DEP**2
       DEP_3 = DEP**3
 !
       B     = 1./15.
       B2    = 2.*B
-      B3    = (B + (1./3.))
+      B3    = B + 1./3.
 !
-      IF (ICC .EQ. 1) THEN !Boussinesq
-          R = 0.75 * (W2 + W12)
+      IF ( ITRF.EQ.1 ) THEN !classic Boussinesq
+!          R = 0.75 * (W2 + W12) should be W1! See Herbers and Burton, Eq. 11
+          R = 0.75 * W1
           S = -DEP * SQRT(GRAV*DEP)
 !
-      ELSEIF (ICC .EQ. 2) THEN !Deterministic Boussinesq
+      ELSEIF ( ITRF.EQ.2 ) THEN !deterministic Boussinesq
 !         to avoid NaN when W2*W12=0=K2*K12, adapt product of K2 and K12
-          KPROD = SIGN(MAX(1.E-20, ABS(K2*K12)),K2*K12)
-          R     =  (0.5 + ((W2*W12)/(GRAV*DEP*KPROD))) * (K2 + K12)**2
+          PROD = SIGN(MAX(1.E-20, ABS(K2*K12)),K2*K12)
+          R     =  (0.5 + ((W2*W12)/(GRAV*DEP*PROD))) * (K2 + K12)**2
 !
           S     = (-2./GRAV) * (  (GRAV*DEP*K1)
      &                          + (B2*GRAV*DEP_3*K1**3)
      &                          - (B3*DEP_2*K1*W1**2)   )
 !
+      ELSEIF ( ITRF.EQ.3 .OR. ITRF.EQ.4 ) THEN !Bredmose or QuadWave1D
+          KLM  = K2 + K12
+          WLM2 = GRAV * KLM * TANH(KLM*DEP)
+!
+          FAC1 = ABS(KLM) * DEP * ( ABS(KLM)/ABS(K1) )**A1
+          FAC2 = EXP( -(FAC1/A3)**A2 )
+          IF (ITRF.EQ.3) FAC2 = 1.
+!
+!         to avoid NaN when W2*W12=0, adapt product of W2 and W12
+          PROD = SIGN(MAX(1.E-20, ABS(W2*W12)),W2*W12)
+          R = -0.5 * FAC2 * GRAV / PROD *
+     &        ( WLM2 * K2 * K12 + W1 * KLM * (K2*W12 + K12*W2) )
+     &        -0.5 * FAC2 * WLM2 / GRAV * ( W2 * W12 - W1*W1 )
+          S = ( W1*W1 - WLM2 ) / ( K1 - KLM )
+!
       ENDIF
 !
       RETURN
       END subroutine TCOEF
-!
-!********************************************************************
-!
-      SUBROUTINE COAPP (AC2, SPCSIG, DEP2, IDCMIN, IDCMAX, INTPL, SX,
-     &                  KX , CX, CGX, E  , EI    , EX    , EIX  , WX)
-!
-!********************************************************************
-!
-      USE OCPCOMM4
-      USE SWCOMM3
-      USE SWCOMM4
-
-      IMPLICIT NONE
-!
-!
-!   --|-----------------------------------------------------------|--
-!     | Delft University of Technology                            |
-!     | Faculty of Civil Engineering and Geosciences              |
-!     | Environmental Fluid Mechanics Section                     |
-!     | P.O. Box 5048, 2600 GA  Delft, The Netherlands            |
-!     |                                                           |
-!     | Programmers: The SWAN team                                |
-!   --|-----------------------------------------------------------|--
-!
-!
-!     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2024  Delft University of Technology
-!
-!     This program is free software: you can redistribute it and/or modify
-!     it under the terms of the GNU General Public License as published by
-!     the Free Software Foundation, either version 3 of the License, or
-!     (at your option) any later version.
-!
-!     This program is distributed in the hope that it will be useful,
-!     but WITHOUT ANY WARRANTY; without even the implied warranty of
-!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-!     GNU General Public License for more details.
-!
-!     You should have received a copy of the GNU General Public License
-!     along with this program. If not, see <http://www.gnu.org/licenses/>.
-!
-!
-!  0. Authors
-
-!     41.46: James Salmon
-
-!  1. Updates
-
-!     41.46, Nov 2014: new subroutine
-
-!  2. Purpose
-!
-!     Pre-calculate directional integrations for symmetric subst.
-!     Interpolates energy densities and integrated energy densities at
-!      interacting frequencies
-!     Calculates corresponding wave numbers and phase velocities
-!
-!  3. Method
-!
-!     Use technique from SWLTA that due to logarithmic distribution, a given factor between two freq.
-!      is the same number of freq. bins
-!
-!  4. Argument variables
-!
-!     AC2         action density
-!     SPCSIG      relative frequencies in computational domain in sigma-space
-!     IDCMIN      minimum counter in directional space
-!     IDCMAX      maximum counter in directional space
-!     INTPL       Switch to control the interpolation
-!                    0 = use lumping i.e. sum at half; dif. at double
-!                    1 = use correct terms i.e. sum with p-m; dif. with p+m
-!
-      REAL    :: AC2(MDC,MSC,MCGRD)
-      REAL    :: SPCSIG(MSC)
-      REAL    :: DEP2(MCGRD)
-      INTEGER :: IDCMIN(MSC), IDCMAX(MSC)
-      INTEGER :: INTPL
-!
-!     SX     relative frequencies at sum and difference frequencies
-!     KX     wave number at sum and difference frequencies
-!     CGX    group velocity at sum and difference velocities
-!     CX     phase velocity at sum and difference velocities
-!     E      energy density as function of frequency and direction
-!     EI     integrated E over PWDTH as funct. of dir. and freq..
-!     EX     E at sum and difference frequencies SX
-!     EIX    EI densities at sum and dif. freq. SX
-!     WX     weights for logarithmic interpolation
-!
-      REAL, INTENT(OUT) :: SX(MSC,MSC,2)
-      REAL, INTENT(OUT) :: KX(MSC,MSC,2)
-      REAL, INTENT(OUT) :: CGX(MSC,MSC,2)
-      REAL, INTENT(OUT) :: CX(MSC,MSC,2)
-      REAL, INTENT(OUT) :: E(MDC,MSC)
-      REAL, INTENT(OUT) :: EI(MDC,MSC)
-      REAL, INTENT(OUT) :: EX(MDC,MSC,MSC,2)
-      REAL, INTENT(OUT) :: EIX(MDC,MSC,MSC,2)
-      REAL, INTENT(OUT) :: WX(MSC,MSC,2)
-!
-!     Values from common
-!
-!     MDC       : Size of array in theta-direction
-!     MSC       : Size of array in sigma-direction
-!     PI        : Circular constant Pi
-!     PTRIAD(8) : range to integrate over (in degrees)
-!
-!  6. Local variables
-!
-!     B     :     interger inteval of bins for interpolation
-!     DUMMY :     dummy variable
-!     FX    :     factors for interpolation to sum and dif.  freqencies
-!     I1    :     auxiliary integer
-!     I2    :     auxiliary integer
-!     ID    :     counter
-!     II    :     loop counter
-!     IS    :     loop counter in frequency space
-!     PAVL  :     integration over PINT using sector
-!     PEXC  :     fraction of excess at outermost directional bins
-!     PFAC  :     correction using PEXC using sector
-!     PINT  :     outermost directional bin for integration
-!     PLIM  :     relative indices for directional bin limits
-!     PSUM  :     sum of E(tht,f) over PWDTH
-!     PWDTH :     integral range in rad. / 2
-!     XIS   :     rate between two succeeding frequency counters
-!     XISLN :     log of XIS
-!
-      INTEGER ID, II, IS, I1, I2
-      INTEGER PINT, PLIM(2), B(2)
-      REAL    PEXC, PSUM   , PWDTH  , PAVL(2), PFAC(2)
-      REAL    XIS , XISLN
-      REAL    FX(MSC,MSC,2)
-      REAL    D   , TMP(4)
-!
-!
-!  7. SUBROUTINES USED
-
-
-!  8. SUBROUTINES CALLING
-
-!     SWSPB
-
-!  9. ERROR MESSAGES
-
-!     ---
-
-! 10. REMARKS
-
-!     ---
-
-! 11. STRUCTURE
-
-!     -----------------------------------------------------------------
-
-!     -----------------------------------------------------------------
-
-! 13. Source text
-!
-      D = DEP2(KCGRD(1))
-!
-!     --- convert from AC(tht,f) to E(tht,f)
-!
-      E = 0.
-      DO II = 1, MDC
-         DO IS = 1, MSC
-            E(II,IS) = AC2(II,IS,KCGRD(1)) * 2. * PI * SPCSIG(IS)
-         ENDDO
-      ENDDO
-!
-!     --- integrate over range dir0-(p) <= tht < dir+(p)
-!
-      EI = 0.
-      IF (.NOT.PTRIAD(8).NE.-1.) THEN
-         ! --- full circle integration
-         DO IS = 1, MSC
-            DO II = IDCMIN(IS), IDCMAX(IS)
-               ID = MOD(II - 1 + MDC, MDC) + 1
-               EI(ID,IS) = SUM(E(:,IS), DIM=1) * DDIR
-            ENDDO
-         ENDDO
-      ELSE
-         ! --- integrate over range PWDTH
-         PWDTH = PTRIAD(8) * PI/180.
-         PINT = INT((PWDTH/DDIR) - 0.5) + 1
-         PEXC = (((PINT + 0.5) * DDIR) - PWDTH) / DDIR
-         IF (FULCIR) THEN
-            ! --- integration over circle
-            DO IS = 1, MSC
-               DO II = IDCMIN(IS), IDCMAX(IS)
-                  ID = MOD(II - 1 + MDC, MDC) + 1
-                  PSUM = 0.
-                  PLIM = 0
-                  ! --- define integration limits
-                  PLIM(1) = MOD(ID - PINT + MDC - 1, MDC) + 1
-                  PLIM(2) = MAX(MOD(ID + PINT      , MDC),  1)
-                  ! --- sum values by full int.&subtract or zero and adding
-                  PSUM    = SUM(E(:,IS), DIM=1)
-     &                    * MIN(MAX(REAL(PLIM(1) - PLIM(2)), 0.), 1.)
-                  PSUM    = PSUM - SUM(E(1:PLIM(1),IS), DIM=1)
-     &                           + SUM(E(1:PLIM(2),IS), DIM=1)
-                  PSUM    = PSUM - ( (E(PLIM(1),IS)
-     &                              + E(PLIM(2),IS)) * PEXC)
-                  !
-                  EI(ID,IS) = PSUM * DDIR
-               ENDDO
-            ENDDO
-         ELSE
-            ! --- integration over a sector
-            DO IS = 1, MSC
-               DO II = IDCMIN(IS), IDCMAX(IS)
-                  ID = MOD(II - 1 + MDC, MDC) + 1
-                  PSUM = 0.
-                  PLIM = 0
-                  ! --- define integration limits
-                  PLIM(1) = MAX(ID - PINT, 1)
-                  PLIM(2) = MIN(ID + PINT, MDC)
-                  PSUM    = SUM(E(ID-PINT:ID+PINT,IS), DIM=1)
-                  ! --- determine range covered
-                  PAVL(1) = (ID       - 0.5) * DDIR
-                  PAVL(2) = (MDC - ID + 0.5) * DDIR
-                  PFAC(1) = MIN(MAX(PAVL(1) - PWDTH, 0.), 1.) * PEXC
-                  PFAC(2) = MIN(MAX(PAVL(2) - PWDTH, 0.), 1.) * PEXC
-                  ! --- remove excess
-                  PSUM    = PSUM - ( E(PLIM(1),IS) * PFAC(1)
-     &                              +E(PLIM(2),IS) * PFAC(2))
-                  !
-                  EI(ID,IS) = PSUM*DDIR
-               ENDDO
-            ENDDO
-         ENDIF
-      ENDIF
-!
-!     --- compute some indices in sigma space
-!     --- generate factors for logarithmic interpolation
-!     --- interpolate E and EI
-!
-      I2    = INT(FLOAT(MSC) / 2.)
-      I1    = I2-1
-      XIS   = SPCSIG(I2) / SPCSIG(I1)        !=1 + df/f
-      XISLN = LOG(XIS)
-!
-      FX  = 0.
-      SX  = 0.
-      KX  = 0.
-      CGX = 0.
-      CX  = 0.
-      EX  = 0.
-      EIX = 0.
-      WX  = 0.
-      IF (INTPL .EQ. 0) THEN
-         ! --- compute only self-self interactions
-         ! --- factors for lumping
-         FX(:,:,1) = 0.5
-         FX(:,:,2) = 2.
-         DO IS = 1, MSC
-            DO ID = 1, 2
-               ! --- determine # freq. bins to either side of target
-               TMP  = 0.
-               B    = 0
-               B(1) = INT(LOG(FX(IS,1,ID)) / XISLN)
-               B(2) = B(1) + SIGN(1, B(1))
-               ! --- determine interpolation weight
-               WX(IS,1,ID)    = (FX(IS,1,ID) - XIS**B(2))
-     &                        / (XIS**B(1)   - XIS**B(2))
-               ! --- interpolation
-!              --- !Check if diff. freq. >= min(freq.) and sum < 2*max*freq(
-               IF (IS .GT. -B(2) .AND. MSC .GT. IS+B(2)+1) THEN
-                  SX(IS,:,ID)  = (SPCSIG(IS+B(2))*(1.-WX(IS,1,ID)))
-     &                         + (SPCSIG(IS+B(1))*    WX(IS,1,ID) )
-                  TMP(1)       =  SX(IS,1,ID)
-                  CALL KSCIP1(1,TMP(1),D,TMP(2),TMP(3),TMP(4),TMP(4))
-                  KX(IS,:,ID)  = TMP(2)
-                  CGX(IS,:,ID) = TMP(3)
-                  CX(IS,:,ID)  = SX(IS,:,ID) / KX(IS,:,ID)
-                  EX(:,IS,IS,ID)  = (E(:,IS+B(2))*(1.-WX(IS,1,ID)))
-     &                           + (E(:,IS+B(1)) *    WX(IS,1,ID) )
-                  EIX(:,IS,IS,ID) = (EI(:,IS+B(2))*(1.-WX(IS,1,ID)))
-     &                           + (EI(:,IS+B(1)) *    WX(IS,1,ID) )
-               ELSE
-                  SX(IS,:,ID)    =  ( (SPCSIG(IS)*XIS**B(2)) *
-     &                                      (1.-WX(IS,II,ID))  )
-     &                             + ( (SPCSIG(IS)*XIS**B(1)) *
-     &                                         (WX(IS,II,ID))  )
-                  TMP(1)        =  SX(IS,1,ID)
-                  CALL KSCIP1(1,TMP(1),D,TMP(2),TMP(3),TMP(4),TMP(4))
-                  KX(IS,:,ID)    = TMP(2)
-                  CGX(IS,:,ID)   = TMP(3)
-                  CX(IS,:,ID)    = SX(IS,1,ID) / KX(IS,1,ID)
-                  EX(:,IS,IS,ID)  = 0.
-                  EIX(:,IS,IS,ID) = 0.
-               ENDIF
-            ENDDO
-         ENDDO
-      ELSEIF (INTPL .EQ. 1) THEN
-         ! --- compute all interacting frequencies
-         DO IS = 1, MSC
-            DO II = 1, MSC
-               ! --- factors for all sum and diff. interactions
-               FX(IS,II,1) = MAX((SPCSIG(IS) - SPCSIG(II))
-     &                                       / SPCSIG(IS), 1.E-20)
-               FX(IS,II,2) =  (SPCSIG(IS) + SPCSIG(II)) / SPCSIG(IS)
-               !
-               DO ID = 1, 2
-                  ! --- determine # freq. bins to either side of target
-                  TMP  = 0.
-                  B    = 0
-                  B(1) = INT(LOG(FX(IS,II,ID)) / XISLN)
-                  B(2) = B(1) + SIGN(1, B(1))
-                  ! --- determine interpolation weight
-                  WX(IS,II,ID) = (FX(IS,II,ID) - XIS**B(2))
-     &                         / (XIS**B(1)    - XIS**B(2))
-                  ! --- interpolation
-!                 --- !Check if diff. freq. >= min(freq.) and sum < 2*max*freq(
-                  IF (IS .GT. -B(2) .AND. MSC .GT. IS+B(2)+1) THEN
-                     SX(IS,II,ID)  = (SPCSIG(IS+B(2))*(1.-WX(IS,II,ID)))
-     &                             + (SPCSIG(IS+B(1))*    WX(IS,II,ID) )
-                     TMP(1)        =  SX(IS,II,ID)
-                     CALL KSCIP1(1,TMP(1),D,TMP(2),TMP(3),TMP(4),TMP(4))
-                     KX(IS,II,ID)  = TMP(2)
-                     CGX(IS,II,ID) = TMP(3)
-                     CX(IS,II,ID)  = SX(IS,II,ID) / KX(IS,II,ID)
-                     EX(:,IS,II,ID)  = (E(:,IS+B(2)) *(1.-WX(IS,II,ID)))
-     &                              + (E(:,IS+B(1)) *    WX(IS,II,ID))
-                     EIX(:,IS,II,ID) = (EI(:,IS+B(2))*(1.-WX(IS,II,ID)))
-     &                              + (EI(:,IS+B(1))*    WX(IS,II,ID))
-                  ELSE
-                     SX(IS,II,ID)    =  ( (SPCSIG(IS)*XIS**B(2)) *
-     &                                         (1.-WX(IS,II,ID))  )
-     &                                + ( (SPCSIG(IS)*XIS**B(1)) *
-     &                                            (WX(IS,II,ID))  )
-                     TMP(1)        =  SX(IS,II,ID)
-                     CALL KSCIP1(1,TMP(1),D,TMP(2),TMP(3),TMP(4),TMP(4))
-                     KX(IS,II,ID)    = TMP(2)
-                     CGX(IS,II,ID)   = TMP(3)
-                     CX(IS,II,ID)    = SX(IS,II,ID) / KX(IS,II,ID)
-                     EX(:,IS,II,ID)  = 0.
-                     EIX(:,IS,II,ID) = 0.
-                  ENDIF
-               ENDDO
-            ENDDO
-         ENDDO
-      ENDIF
-!
-      RETURN
-      END subroutine COAPP
 !
 !****************************************************************
 !
@@ -3517,16 +3221,18 @@
 !  0. Authors
 !
 !     42.01: Marcel Zijlema
+!     42.15: Marcel Zijlema
 !
 !  1. Updates
 !
 !     42.01, November 2022: new subroutine
+!     42.15,      May 2024: extenstion FTIM
 !
 !  2. Purpose
 !
 !     computes frequency-dependent interpolation factors
 !     and frequency- and space-dependent scaling factors
-!     for the LTA/DCTA method
+!     for the triad-wave interactions
 !
 !  4. Argument variables
 !
@@ -3540,14 +3246,13 @@
 !
 !     A     :     = (kd)^2
 !     ARR   :     auxiliary array (not used)
-!     AUX1  :     auxiliary real
-!     AUX2  :     auxiliary real
 !     C0    :     phase velocity at central bin
 !     CG    :     group velocity as function of frequency
 !     CG1   :     group velocity at first frequency bin
 !     CG2   :     group velocity at second frequency bin
-!     CM    :     phase velocity at interacting bin
 !     DEPLOC:     local water depth
+!     DF    :     frequency step
+!     DK    :     wave number mismatch
 !     FT    :     = tanh(kd)/kd
 !     I1    :     auxiliary integer
 !     I2    :     auxiliary integer
@@ -3564,25 +3269,31 @@
 !     K1    :     wave number at first frequency bin
 !     K2    :     wave number at second frequency bin
 !     K3    :     wave number at third interpolated bin
+!     KB    :     SPB (empirical) parameter that represents
+!                 the broadness of resonance condition
 !     KM    :     mean wave number
 !     P     :     shape coefficient (=4/3)
+!     R     :     the numerator of the transfer function
 !     RINT  :     interaction coefficient
+!     S     :     the denominator of the transfer function
 !     SIG1  :     frequency of first component
 !     SIG2  :     frequency of second component
 !     SIG3  :     frequency of third component
-!     W0    :     radian frequency of central bin
+!     W0    :     radian frequency of bound super harmonic (p)
 !     WIS   :     interpolation weight factor
-!     WM    :     radian frequency of interacting bin
-!     WN0   :     wave number at central bin
-!     WNM   :     wave number at interacting bin
+!     WM    :     radian frequency of secondary harmonic (m)
+!     WPM   :     radian frequency of primary harmonic (p-m)
+!     WN0   :     wave number of bound super harmonic (p)
+!     WNM   :     wave number of secondary harmonic (m)
+!     WNPM  :     wave number of primary harmonic (p-m)
 !     XIS   :     rate between two succeeding frequency counters
 !     XISLN :     log of XIS
 !
       INTEGER I1, I2, IENT, IP, IS, IS1, IS2, IS3, ISLOW, J
-      REAL    AUX1, AUX2, C0, CM, RINT, W0, WM, WN0, WNM, XIS,
-     &        XISLN
-      REAL    A, ARR(MSC), CG(MSC), CG1, CG2, DEPLOC, FT, ISB,
-     &        K(MSC), K1, K2, K3, KM, P, SIG1, SIG2, SIG3, WIS
+      REAL    C0, R, S, RINT, W0, WM, WPM, WN0, WNM, WNPM,
+     &        XIS, XISLN
+      REAL    A, ARR(MSC), CG(MSC), CG1, CG2, DEPLOC, DF, DK, FT, ISB,
+     &        K(MSC), K1, K2, K3, KB, KM, P, SIG1, SIG2, SIG3, WIS
 !
 ! 13. Source text
 !
@@ -3590,28 +3301,50 @@
       DATA IENT/0/
       IF (LTRACE) CALL STRACE (IENT,'FAC3WW')
 !
-      QTRI1 = 0.
+      QTRI2 = 0.
 
       IF ( ITRIAD.EQ.1 .OR. ITRIAD.EQ.11 ) THEN
 !
 !        --- compute some indices in sigma space
 !
-         I2     = INT (FLOAT(MSC) / 2.)
-         I1     = I2 - 1
-         XIS    = SPCSIG(I2) / SPCSIG(I1)
-         XISLN  = LOG( XIS )
-
-         ISP    = INT( LOG(2.) / XISLN )
-         ISP1   = ISP + 1
-         WISP   = (2. - XIS**ISP) / (XIS**ISP1 - XIS**ISP)
-         WISP1  = 1. - WISP
-
-         ISM    = INT( LOG(0.5) / XISLN )
-         ISM1   = ISM - 1
-         WISM   = (XIS**ISM -0.5) / (XIS**ISM - XIS**ISM1)
-         WISM1  = 1. - WISM
+         I2    = INT (FLOAT(MSC) / 2.)
+         I1    = I2 - 1
+         XIS   = SPCSIG(I2) / SPCSIG(I1)
+         XISLN = LOG( XIS )
 !
-         DO IP = 1, MCGRD
+!        --- indices of second harmonic (self interaction)
+!
+         ISP  (2) = INT( LOG(2.) / XISLN )
+         ISP1 (2) = ISP(2) + 1
+         WISP (2) = (2. - XIS**ISP(2)) / (XIS**ISP1(2) - XIS**ISP(2))
+         WISP1(2) = 1. - WISP(2)
+
+         ISM  (2,1) = INT( LOG(0.5) / XISLN )
+         ISM1 (2,1) = ISM(2,1) - 1
+         WISM (2,1) = (XIS**ISM(2,1) -0.5) /
+     &                (XIS**ISM(2,1) - XIS**ISM1(2,1))
+         WISM1(2,1) = 1. - WISM(2,1)
+!
+!        --- indices of third harmonic (sum interaction)
+!
+         ISP  (3) = INT( LOG(3.) / XISLN )
+         ISP1 (3) = ISP(3) + 1
+         WISP (3) = (3. - XIS**ISP(3)) / (XIS**ISP1(3) - XIS**ISP(3))
+         WISP1(3) = 1. - WISP(3)
+
+         ISM  (3,1) = INT( LOG(1./3.) / XISLN )
+         ISM1 (3,1) = ISM(3,1) - 1
+         WISM (3,1) = (XIS**ISM(3,1) -1./3.) /
+     &                (XIS**ISM(3,1) - XIS**ISM1(3,1))
+         WISM1(3,1) = 1. - WISM(3,1)
+
+         ISM  (3,2) = INT( LOG(2./3.) / XISLN )
+         ISM1 (3,2) = ISM(3,2) - 1
+         WISM (3,2) = (XIS**ISM(3,2) -2./3.) /
+     &                (XIS**ISM(3,2) - XIS**ISM1(3,2))
+         WISM1(3,2) = 1. - WISM(3,2)
+!
+         DO IP = 2, MCGRD
 !
             DEPLOC = DEP(IP)
 !
@@ -3624,32 +3357,253 @@
                CG =  0.
             ENDIF
 !
+            CG1 = 1.
+!
 !           --- compute LTA scaling factor
 !
             DO IS = 1, MSC
+!
+               IF (ITRIAD.EQ.11) CG1 = CG(IS)
 
+!              --- bound super harmonic (sum frequency)
                W0  = SPCSIG(IS)
                WN0 = K     (IS)
                C0  = W0 / WN0
 
-               IF ( IS.GT.-ISM1 ) THEN
-                  WM  = WISM * SPCSIG(IS+ISM1) + WISM1 * SPCSIG(IS+ISM)
-                  WNM = WISM * K     (IS+ISM1) + WISM1 * K     (IS+ISM)
-                  CM  = WM / WNM
+!              --- primary wave (half the sum frequency)
+               IF ( IS.GT.-ISM1(2,1) ) THEN
+                  WM  = WISM (2,1) * SPCSIG(IS+ISM1(2,1)) +
+     &                  WISM1(2,1) * SPCSIG(IS+ISM (2,1))
+                  WNM = WISM (2,1) * K     (IS+ISM1(2,1)) +
+     &                  WISM1(2,1) * K     (IS+ISM (2,1))
                ELSE
                   WM  = 0.
                   WNM = 0.
-                  CM  = 0.
                END IF
 
-               AUX1 = WNM**2 * ( GRAV * DEPLOC + 2.*CM**2 )
-               AUX2 = WN0 * DEPLOC * ( GRAV * DEPLOC +
-     &                            (2./15.) * GRAV * DEPLOC**3 * WN0**2 -
-     &                            (2./ 5.) * W0**2 * DEPLOC**2 )
-               RINT = AUX1 / AUX2
+!              compute interaction coefficient of self-self component
+               IF ( DEPLOC.GT.DEPMIN ) THEN
+                  CALL TCOEF (W0,WM,WM,WN0,WNM,WNM,DEPLOC,R,S)
+                  RINT = R / S
+               ELSE
+                  RINT = 0.
+               ENDIF
 
-               QTRI1(IS,IP) = PTRIAD(1) * C0 * CG(IS) * RINT**2
+               QTRI2(IS,IP,1) = PTRIAD(1) * CG1 * C0 * RINT**2
 
+!              --- primary wave (one third of the sum frequency)
+               IF ( IS.GT.-ISM1(3,1) ) THEN
+                  WPM  = WISM (3,1) * SPCSIG(IS+ISM1(3,1)) +
+     &                   WISM1(3,1) * SPCSIG(IS+ISM (3,1))
+                  WNPM = WISM (3,1) * K     (IS+ISM1(3,1)) +
+     &                   WISM1(3,1) * K     (IS+ISM (3,1))
+               ELSE
+                  WPM  = 0.
+                  WNPM = 0.
+               END IF
+
+!              --- secondary wave (two third of the sum frequency)
+               IF ( IS.GT.-ISM1(3,2) ) THEN
+                  WM  = WISM (3,2) * SPCSIG(IS+ISM1(3,2)) +
+     &                  WISM1(3,2) * SPCSIG(IS+ISM (3,2))
+                  WNM = WISM (3,2) * K     (IS+ISM1(3,2)) +
+     &                  WISM1(3,2) * K     (IS+ISM (3,2))
+               ELSE
+                  WM  = 0.
+                  WNM = 0.
+               END IF
+
+!              compute interaction coefficient for third harmonic
+               IF ( DEPLOC.GT.DEPMIN ) THEN
+                  CALL TCOEF (W0,WM,WPM,WN0,WNM,WNPM,DEPLOC,R,S)
+                  RINT = R / S
+               ELSE
+                  RINT = 0.
+               ENDIF
+
+               QTRI2(IS,IP,2) = PTRIAD(1) * CG1 * C0 * RINT**2
+
+            ENDDO
+!
+         ENDDO
+!
+      ELSE IF ( ITRIAD.EQ.2 .OR. ITRIAD.EQ.3 ) THEN
+!
+         QTRI1 = 0.
+!
+         DO IP = 2, MCGRD
+!
+            DEPLOC = DEP(IP)
+!
+!           --- compute wave number and group velocity
+!
+            IF ( DEPLOC.GT.DEPMIN ) THEN
+               CALL KSCIP1 (MSC, SPCSIG, DEPLOC, K, CG, ARR, ARR)
+            ELSE
+               K  = -1.
+               CG =  0.
+            ENDIF
+!
+            J = 0
+
+            DO IS1 = 1, MSC
+!
+!              --- bound super harmonic
+!
+               SIG1 = SPCSIG(IS1)
+               K1   = K     (IS1)
+               CG1  = CG    (IS1)
+!
+!              --- sum interactions
+!
+               DO IS2 = 1, IS1-1
+
+!                 --- secondary wave
+!
+                  SIG2 = SPCSIG(IS2)
+                  K2   = K     (IS2)
+!
+!                 --- primary wave
+                  SIG3 = SIG1 - SIG2
+!
+                  J = J + 1
+!
+!                 --- obtain and store interpolation factors
+!
+                  IF ( SIG3.GT.SPCSIG(1) ) THEN
+!
+                     ISB = LOG( SIG3/SPCSIG(1) ) / FRINTF
+!
+                     IS3 = INT(ISB)
+                     WIS = ISB - REAL(IS3)
+                     IS3 = IS3 + 1
+
+                     QTRI1(J,1) = WIS
+                     QTRI1(J,2) = FLOAT(IS3)
+!
+                  ENDIF
+!
+!                 --- compute the wave number of primary component
+!
+                  IF ( DEPLOC.GT.DEPMIN ) THEN
+                     CALL KSCIP1 (1, SIG3, DEPLOC, K3, ARR, ARR, ARR)
+                  ELSE
+                     K3 = -1.
+                  ENDIF
+!
+!                 --- compute the wave number mismatch and frequency step
+!
+                  DK = K3 + K2 - K1
+                  DF = FRINTF * SIG2 / PI2
+!
+!                 --- compute and store transfer functions
+!
+                  IF ( DEPLOC.GT.DEPMIN ) THEN
+                     CALL TCOEF(SIG1,SIG2, SIG3,K1,K2, K3,DEPLOC,R,S)
+                     RINT = R / S
+                     QTRI2(J,IP,2) = R / S
+                     CALL TCOEF(SIG2,SIG1,-SIG3,K2,K1,-K3,DEPLOC,R,S)
+                     QTRI2(J,IP,3) = R / S
+                     CALL TCOEF(SIG3,SIG1,-SIG2,K3,K1,-K2,DEPLOC,R,S)
+                     QTRI2(J,IP,4) = R / S
+                  ELSE
+                     RINT = 0.
+                     QTRI2(J,IP,2:4) = 0.
+                  ENDIF
+!
+!                 --- compute and store proportionality factor
+!                     depending on the bispectrum parametrization
+!
+                  IF ( ITRIAD.EQ.2 ) THEN
+!                    SPB of Becq-Girard et al (1999)
+                     KM = MIN(K1,K2,K3) ! according to James Salmon
+                     KB = PTRIAD(6)*KM + PTRIAD(7)
+                     FT = KB * DF / (DK*DK + KB*KB)
+                  ELSE IF ( ITRIAD.EQ.3 ) THEN
+!                    based on the quasi-normal closure using parametrized biphase
+!                    (see routine SWFTIM)
+                     FT = DF / MAX( ABS(DK), 0.1*K1 )
+                  ENDIF
+!
+                  QTRI2(J,IP,1) = PTRIAD(1) * FT * CG1 * RINT
+!
+               ENDDO
+!
+!              --- difference interactions
+!
+               DO IS2 = 1, MSC
+
+!                 --- secondary wave
+!
+                  SIG2 = SPCSIG(IS2)
+                  K2   = K     (IS2)
+!
+!                 --- primary wave
+                  SIG3 = SIG1 + SIG2
+!
+                  J = J + 1
+!
+!                 --- obtain and store interpolation factors
+!
+                  IF ( SIG3.LT.SPCSIG(MSC) ) THEN
+!
+                     ISB = LOG( SIG3/SPCSIG(1) ) / FRINTF
+!
+                     IS3 = INT(ISB)
+                     WIS = ISB - REAL(IS3)
+                     IS3 = IS3 + 1
+
+                     QTRI1(J,1) = WIS
+                     QTRI1(J,2) = FLOAT(IS3)
+!
+                  ENDIF
+!
+!                 --- compute the wave number of primary component
+!
+                  IF ( DEPLOC.GT.DEPMIN ) THEN
+                     CALL KSCIP1 (1, SIG3, DEPLOC, K3, ARR, ARR, ARR)
+                  ELSE
+                     K3 = -1.
+                  ENDIF
+!
+!                 --- compute the wave number mismatch and frequency step
+!
+                  DK = K1 + K2 - K3
+                  DF = FRINTF * SIG2 / PI2
+!
+!                 --- compute and store transfer functions
+!
+                  IF ( DEPLOC.GT.DEPMIN ) THEN
+                     CALL TCOEF(SIG3,SIG2, SIG1,K3,K2, K1,DEPLOC,R,S)
+                     QTRI2(J,IP,2) = R / S
+                     CALL TCOEF(SIG2,SIG3,-SIG1,K2,K3,-K1,DEPLOC,R,S)
+                     QTRI2(J,IP,3) = R / S
+                     CALL TCOEF(SIG1,SIG3,-SIG2,K1,K3,-K2,DEPLOC,R,S)
+                     RINT = R / S
+                     QTRI2(J,IP,4) = R / S
+                  ELSE
+                     RINT = 0.
+                     QTRI2(J,IP,2:4) = 0.
+                  ENDIF
+!
+!                 --- compute and store proportionality factor
+!                     depending on the bispectrum parametrization
+!
+                  IF ( ITRIAD.EQ.2 ) THEN
+!                    SPB of Becq-Girard et al (1999)
+                     KM = MIN(K1,K2,K3) ! according to James Salmon
+                     KB = PTRIAD(6)*KM + PTRIAD(7)
+                     FT = KB * DF / (DK*DK + KB*KB)
+                  ELSE IF ( ITRIAD.EQ.3 ) THEN
+!                    based on the quasi-normal closure using parametrized biphase
+!                    (see routine SWFTIM)
+                     FT = DF / MAX( ABS(DK), 0.1*K1 )
+                  ENDIF
+!
+                  QTRI2(J,IP,1) = PTRIAD(1) * FT * CG1 * RINT
+!
+               ENDDO
+!
             ENDDO
 !
          ENDDO
@@ -3658,9 +3612,9 @@
 !
          P = PTRIAD(2)
 !
-         QTRI2 = 0.
+         QTRI1 = 0.
 !
-         DO IP = 1, MCGRD
+         DO IP = 2, MCGRD
 !
             DEPLOC = DEP(IP)
 !
@@ -3754,10 +3708,10 @@
 !
 !****************************************************************
 !
-      SUBROUTINE SWLTA ( AC2   , DEP2  , SPCSIG,
+      SUBROUTINE SWLTA ( AC2   , DEP2  , CGO   , SPCSIG,
      &                   IMATRA, IMATDA, REDC0 , REDC1 ,
      &                   IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                   SMEBRK, PLTRI , URSELL, BIPHAS, QTL1  )
+     &                   SMEBRK, PLTRI , URSELL, BIPHAS, QTL2  )
 !
 !****************************************************************
 !
@@ -3767,7 +3721,6 @@
       USE M_SNL3
 !
       IMPLICIT NONE
-!
 !
 !
 !   --|-----------------------------------------------------------|--
@@ -3803,6 +3756,7 @@
 !     40.85: Marcel Zijlema
 !     41.44: James Salmon, Pieter Smit
 !     42.01: Marcel Zijlema
+!     42.11: Ad Reniers
 !
 !  1. Updates
 !
@@ -3810,6 +3764,7 @@
 !     40.85, Aug. 08: store triads for output purposes
 !     41.44, Oct. 13: include consistent collinear approximation (CCA)
 !     42.01, Nov. 22: directional integration for CCA made tunable
+!     42.11, May  24: add interaction at third harmonic
 !
 !  2. Purpose
 !
@@ -3825,15 +3780,15 @@
 !
 !  3. Method
 !
-!     The source term as function of frequency p is (see eq. 7.25):
+!     The source term as function of frequency p is:
 !
-!             +      -
-!     S(p) = S(p) + S(p)
+!                          +      -
+!     S(p) = alpha Cg,p [ S(p) + S(p) ]
 !
 !     in which
 !
 !      +
-!     S(p) = alpha Cp Cg,p (R(p/2,p/2))**2 sin (-beta) ( E(p/2)**2 -2 E(p) E(p/2) )
+!     S(p) = Cp (R(p/2,p/2))**2 sin (-beta) ( E(p/2)**2 -2 E(p) E(p/2) )
 !
 !     and
 !
@@ -3841,10 +3796,11 @@
 !     S(p) = - 2 S(2p)
 !
 !     with alpha a tunable coefficient, beta a parametrized biphase and
-!     R(p/2,p/2) is the interaction coefficient of which the expression can
-!     be found in Eldeberky (1996); see Eq. 7.26.
+!     R(p/2,p/2) is the interaction coefficient
 !
 !     The biphase is computed in routine SINTGRL
+!
+!     The interaction coefficient is computed in routine TCOEF
 !
 !     Note that a slightly adapted formulation of the LTA is used in
 !     in the SWAN model:
@@ -3880,6 +3836,7 @@
 !
 !     AC2         action density
 !     BIPHAS      parameterized biphase of the spectrum                   41.97
+!     CGO         group velocity
 !     DEP2        water depth
 !     IDCMIN      minimum counter in directional space
 !     IDCMAX      maximum counter in directional space
@@ -3889,7 +3846,9 @@
 !     IMATRA      right-hand side of system of equations
 !     ISSTOP      maximum frequency counter in a sweep
 !     PLTRI       triad contribution in TEST points
-!     QTL1        frequency-dependent scaling factor
+!     QTL2        frequency-dependent scaling factor
+!     REDC0       explicit part of energy redistribution for output purposes
+!     REDC1       implicit part of energy redistribution for output purposes
 !     SMEBRK      average (angular) frequency
 !     SPCSIG      relative frequencies in computational domain in sigma-space
 !     URSELL      Ursell number
@@ -3903,26 +3862,31 @@
       REAL :: DEP2(MCGRD)
       REAL :: IMATDA(MDC,MSC), IMATRA(MDC,MSC)
       REAL :: SPCSIG(MSC)
+      REAL :: CGO(MSC,MICMAX)
       REAL :: PLTRI(MDC,MSC,NPTST)
       REAL :: URSELL(MCGRD)
       REAL :: BIPHAS(MCGRD)                                               41.97
-      REAL :: QTL1(MSC,1)                                                 42.01
+      REAL :: QTL2(MSC,2)                                                 42.11 42.01
       REAL :: REDC0 (MDC,MSC,MREDS)                                       40.85
       REAL :: REDC1 (MDC,MSC,MREDS)                                       40.85
 !
 !  6. Local variables
 !
 !     BIPH  :     local biphase
+!     CG    :     local group velocity
 !     DEP   :     water depth
 !     E     :     energy density as function of frequency
-!     E0    :     energy density at central bin
+!     E0    :     energy density of bound super harmonic (=p)             42.11
 !     ED    :     integral energy density over directions                 41.44
-!     ED0   :     integral energy density over directions at central bin  41.44
-!     EDM   :     integral energy density over directions at              41.44
-!                 interacting bin
-!     EM    :     energy density at interacting bin
-!     FT    :     auxiliary real indicating multiplication factor
-!                 for triad contribution
+!     ED0   :     integral energy density over directions of harmonic p   42.11 41.44
+!     EDM   :     integral energy density over directions of second       42.11 41.44
+!                 primary harmonic (m)                                    42.11
+!     EDPM  :     integral energy density over directions of first        42.11
+!                 primary harmonic (p-m)                                  42.11
+!     EEx   :     quadratic products of energy density                    42.11
+!     EM    :     energy density of second primary harmonic (m)           42.11
+!     EPM   :     energy density of first primary harmonic (p-m)          42.11
+!     FT    :     multiplication factor for triad contribution
 !     ID    :     counter
 !     ID1   :     first directional index
 !     ID2   :     last directional index
@@ -3935,15 +3899,17 @@
 !     ISMAX :     maximum of the counter in frequency space for
 !                 which the triad interactions are calculated (cut-off)
 !     PWDTH :     integral range in rad. / 2
-!     SA    :     interaction contribution of triad
+!     SA    :     contribution of triad self interaction
+!     SA3   :     contribution of triad sum interaction                   42.11
 !     SIGPI :     frequency times 2pi
 !     SINBPH:     sine of biphase
 !     STRI  :     total triad contribution
 !
       INTEGER ID, ID1, ID2, IDD, IDDUM, IDW, IENT, II, IS, ISMAX
-      REAL    BIPH, DEP, E0, ED0, EDM,
-     &        EM, FT, PWDTH, SIGPI, SINBPH, STRI
-      REAL    E(MSC), ED(MSC), SA(MDC,MSC+ISP1)
+      REAL    BIPH, CG, DEP, E0, ED0, EDM, EDPM, EE1, EE2, EE3, EM, EPM,
+     &        FT, PWDTH, SIGPI, SINBPH, STRI
+      REAL    E(MSC), ED(MSC),
+     &        SA(MDC,MSC+ISP1(2)), SA3(MDC,MSC+ISP1(3))                   42.11
 !
 !  9. Subroutines calling
 !
@@ -3971,115 +3937,172 @@
       DEP  = DEP2  (KCGRD(1))
       BIPH = BIPHAS(KCGRD(1))
 
-      E  = 0.
-      ED = 0.
-      SA = 0.
+      CG  = 1.
+
+      E   = 0.
+      ED  = 0.
+      SA  = 0.
+      SA3 = 0.
 !
 !     --- compute maximum frequency for which interactions are calculated
 !
       ISMAX = 1
       DO IS = 1, MSC
-       IF ( SPCSIG(IS) .LT. ( PTRIAD(2) * SMEBRK) ) THEN
+       IF ( SPCSIG(IS) .LT. PTRIAD(2) * SMEBRK ) THEN
           ISMAX = IS
         ENDIF
       ENDDO
-      ISMAX = MAX ( ISMAX , ISP1 )
+      ISMAX = MIN ( ISMAX, MIN( MSC+ISP1(2),MSC+ISP1(3) ) )               42.11
+      IF (ITRIAD.EQ.1 .AND. .NOT.PTRIAD(2).NE.-1.) ISMAX = MSC            42.11
 !
 !     --- compute 3 wave-wave interactions
 !
       IF ( .NOT.URSELL(KCGRD(1)).LT.PTRIAD(5) ) THEN
 !
-!       --- determine sine of biphase
+!        --- determine sine of biphase
 !
-        SINBPH = SIN(-BIPH)
+         SINBPH = SIN(-BIPH)
 !
-!       --- determine directional range for CCA integration
+!        --- determine directional range for CCA integration
 !
-        IF ( PTRIAD(8).NE.-1. ) THEN
-           PWDTH = PTRIAD(8) * PI/180.
-           IDW = NINT(PWDTH/(2.*DDIR))
-        ELSE
-!          full directional integration
-           IDW = -1
-        ENDIF
+         IF ( PTRIAD(8).NE.-1. ) THEN
+            PWDTH = PTRIAD(8) * PI/180.
+            IDW = NINT(PWDTH/(2.*DDIR))
+         ELSE
+!           full directional integration
+            IDW = -1
+         ENDIF
 !
-!       --- calculate integral of E(f,t) over all directions, if desired
-        IF ( IDW.EQ.-1 ) THEN
-           ED(:) = SUM(AC2(:,:,KCGRD(1)),DIM=1) * 2.*PI*SPCSIG(:) * DDIR  41.44
-        ENDIF
+!        --- calculate integral of E(f,t) over all directions, if desired
+         IF ( IDW.EQ.-1 ) THEN
+            ED(:) = SUM(AC2(:,:,KCGRD(1)),DIM=1) * 2.*PI*SPCSIG(:) *DDIR  41.44
+         ENDIF
 !
-        DO II = IDDLOW, IDDTOP
-           ID = MOD ( II - 1 + MDC , MDC ) + 1
+         DO II = IDDLOW, IDDTOP
+            ID = MOD ( II - 1 + MDC , MDC ) + 1
 !
-!          --- initialize array with E(f) for the direction theta considered
+!           --- initialize array with E(f) for the direction theta considered
 !
-           E(:) = AC2(ID,:,KCGRD(1)) * 2. * PI * SPCSIG(:)
+            E(:) = AC2(ID,:,KCGRD(1)) * 2. * PI * SPCSIG(:)
 !
-!          --- integrate E(f,t) over range dir-p <= theta <= dir+p
+!           --- integrate E(f,t) over range dir-p <= theta <= dir+p
 !
-           IF ( IDW.NE.-1 ) THEN
-              ID1 = II - IDW
-              ID2 = II + IDW
-              IF ( .NOT.FULCIR ) THEN
-                 ID1 = MAX(ID1,  1)
-                 ID2 = MIN(ID2,MDC)
-              ENDIF
-              ED(:) = 0.
-              DO IDDUM = ID1, ID2
-                 IDD = MOD( IDDUM - 1 + MDC , MDC ) + 1
-                 ED(:) = ED(:) + AC2(IDD,:,KCGRD(1))
-              ENDDO
-              ED(:) = ED(:) * 2. * PI * SPCSIG(:)
-              IF ( IDW.NE.0 ) ED = ED * DDIR
-           ENDIF
+            IF ( IDW.NE.-1 ) THEN
+               ID1 = II - IDW
+               ID2 = II + IDW
+               IF ( .NOT.FULCIR ) THEN
+                  ID1 = MAX(ID1,  1)
+                  ID2 = MIN(ID2,MDC)
+               ENDIF
+               ED(:) = 0.
+               DO IDDUM = ID1, ID2
+                  IDD = MOD( IDDUM - 1 + MDC , MDC ) + 1
+                  ED(:) = ED(:) + AC2(IDD,:,KCGRD(1))
+               ENDDO
+               ED(:) = ED(:) * 2. * PI * SPCSIG(:)
+               IF ( IDW.NE.0 ) ED = ED * DDIR
+            ENDIF
 !
-!          --- compute LTA contribution
+!           --- compute LTA contribution
 !
-           DO IS = 1, ISMAX
+            DO IS = 1, ISMAX
 
-              E0  = E (IS)
-              ED0 = ED(IS)
+!              --- bound super harmonic
+               E0  = E (IS)
+               ED0 = ED(IS)
 
-              IF ( IS.GT.-ISM1 ) THEN
-                 EM  = WISM * E (IS+ISM1) + WISM1 * E (IS+ISM)
-                 EDM = WISM * ED(IS+ISM1) + WISM1 * ED(IS+ISM)
-              ELSE
-                 EM  = 0.
-                 EDM = 0.
-              END IF
+!              --- primary wave (self interaction)
+               IF ( IS.GT.-ISM1(2,1) ) THEN
+                  EM  = WISM (2,1) * E (IS+ISM1(2,1)) +
+     &                  WISM1(2,1) * E (IS+ISM (2,1))
+                  EDM = WISM (2,1) * ED(IS+ISM1(2,1)) +
+     &                  WISM1(2,1) * ED(IS+ISM (2,1))
+               ELSE
+                  EM  = 0.
+                  EDM = 0.
+               END IF
 
-              FT = QTL1(IS,1) * SINBPH
+!              --- compute contribution
+!                  (improved collinear approximation)
 
-              SA(ID,IS) = MAX(0., FT * ( EDM * (EM - E0) - ED0 * EM ))    41.44
+               FT = QTL2(IS,1) * SINBPH
 
-           END DO
-        END DO
+               SA(ID,IS) = MAX(0., FT * ( EDM * (EM - E0) - ED0 * EM ))   41.44
+
+!              --- primary wave (sum interaction)
+               IF ( IS.GT.-ISM1(3,1) ) THEN
+                  EPM  = WISM (3,1) * E (IS+ISM1(3,1)) +
+     &                   WISM1(3,1) * E (IS+ISM (3,1))
+                  EDPM = WISM (3,1) * ED(IS+ISM1(3,1)) +
+     &                   WISM1(3,1) * ED(IS+ISM (3,1))
+               ELSE
+                  EPM  = 0.
+                  EDPM = 0.
+               END IF
+
+!              --- secondary wave (sum interaction)
+               IF ( IS.GT.-ISM1(3,2) ) THEN
+                  EM  = WISM (3,2) * E (IS+ISM1(3,2)) +
+     &                  WISM1(3,2) * E (IS+ISM (3,2))
+                  EDM = WISM (3,2) * ED(IS+ISM1(3,2)) +
+     &                  WISM1(3,2) * ED(IS+ISM (3,2))
+               ELSE
+                  EM  = 0.
+                  EDM = 0.
+               END IF
+
+!              --- compute quadratic products of energy density
+!                  (improved collinear approximation)
+
+               EE1 = 0.5 * ( EM*EDPM + EDM*EPM )
+               EE2 = 0.5 * ( E0*EDPM + ED0*EPM )
+               EE3 = 0.5 * ( EM*ED0  + EDM*E0  )
+
+!              --- compute contribution
+
+               FT = QTL2(IS,2) * SINBPH
+               IF (ITRIAD.EQ.11) FT = 0.
+
+               SA3(ID,IS) = MAX(0., FT * ( EE1 - EE2 - EE3 ))             42.11
+
+            END DO
+         END DO
 !
-!        ---  put source term together
+!         ---  put source term together
 !
-        DO IS = 1, ISSTOP
-           SIGPI = SPCSIG(IS) * 2. * PI
-           DO IDDUM = IDCMIN(IS), IDCMAX(IS)
-              ID = MOD ( IDDUM - 1 + MDC , MDC ) + 1
+         DO IS = 1, ISSTOP
+            SIGPI = SPCSIG(IS) * 2. * PI
+            IF (ITRIAD.NE.11) CG = CGO(IS,1)
+            DO IDDUM = IDCMIN(IS), IDCMAX(IS)
+               ID = MOD ( IDDUM - 1 + MDC , MDC ) + 1
 !
-              STRI = SA(ID,IS) - 2.*(WISP  * SA(ID,IS+ISP1) +
-     &                               WISP1 * SA(ID,IS+ISP ))
+!              --- self interaction
+               STRI = SA(ID,IS) - 2.*(WISP (2) * SA(ID,IS+ISP1(2)) +
+     &                                WISP1(2) * SA(ID,IS+ISP (2)))
 !
-!             --- store results in rhs and main diagonal according
-!                 to Patankar-rules
+!              --- interaction at third harmonic
+               STRI = STRI +
+     &                SA3(ID,IS) - 2.*(WISP (3) * SA3(ID,IS+ISP1(3)) +
+     &                                 WISP1(3) * SA3(ID,IS+ISP (3)))
 !
-              IF(TESTFL) PLTRI(ID,IS,IPTST) = STRI / SIGPI
-              IF (STRI.GT.0.) THEN
-                 IMATRA(ID,IS) = IMATRA(ID,IS) + STRI / SIGPI
-                 REDC0(ID,IS,2)= REDC0(ID,IS,2)+ STRI / SIGPI             40.85
-              ELSE
-                 IMATDA(ID,IS) = IMATDA(ID,IS) - STRI /
-     &                           MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
-                 REDC1(ID,IS,2)= REDC1(ID,IS,2)+ STRI /                   40.85
-     &                           MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)    40.85
-              END IF
-           END DO
-        END DO
+!              --- make energy flux conservative
+               STRI = CG * STRI
+!
+!              --- store results in rhs and main diagonal according
+!                  to Patankar-rules
+!
+               IF(TESTFL) PLTRI(ID,IS,IPTST) = STRI / SIGPI
+               IF (STRI.GT.0.) THEN
+                  IMATRA(ID,IS) = IMATRA(ID,IS) + STRI / SIGPI
+                  REDC0(ID,IS,2)= REDC0(ID,IS,2)+ STRI / SIGPI            40.85
+               ELSE
+                  IMATDA(ID,IS) = IMATDA(ID,IS) - STRI /
+     &                            MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
+                  REDC1(ID,IS,2)= REDC1(ID,IS,2)+ STRI /                  40.85
+     &                            MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)   40.85
+               END IF
+            END DO
+         END DO
 
       END IF
 !
@@ -4098,348 +4121,6 @@
 
       RETURN
       END SUBROUTINE SWLTA
-!
-!********************************************************************
-!
-      SUBROUTINE SWSPB ( AC2   , DEP2  , CGO   , SPCSIG,
-     &                   KWAVE , IMATRA, IMATDA, REDC0 , REDC1 ,
-     &                   IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
-     &                   PLTRI )
-!
-!********************************************************************
-!
-      USE OCPCOMM4
-      USE SWCOMM3
-      USE SWCOMM4
-
-      IMPLICIT NONE
-!
-!
-!   --|-----------------------------------------------------------|--
-!     | Delft University of Technology                            |
-!     | Faculty of Civil Engineering and Geosciences              |
-!     | Environmental Fluid Mechanics Section                     |
-!     | P.O. Box 5048, 2600 GA  Delft, The Netherlands            |
-!     |                                                           |
-!     | Programmers: The SWAN team                                |
-!   --|-----------------------------------------------------------|--
-!
-!
-!     SWAN (Simulating WAves Nearshore); a third generation wave model
-!     Copyright (C) 1993-2024  Delft University of Technology
-!
-!     This program is free software: you can redistribute it and/or modify
-!     it under the terms of the GNU General Public License as published by
-!     the Free Software Foundation, either version 3 of the License, or
-!     (at your option) any later version.
-!
-!     This program is distributed in the hope that it will be useful,
-!     but WITHOUT ANY WARRANTY; without even the implied warranty of
-!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-!     GNU General Public License for more details.
-!
-!     You should have received a copy of the GNU General Public License
-!     along with this program. If not, see <http://www.gnu.org/licenses/>.
-!
-!
-!  0. Authors
-
-!     41.46: James Salmon
-
-!  1. Updates
-
-!     41.46, Nov 2014: new subroutine
-
-!  2. Purpose
-!
-!     Computes triad source term based on Becq-Girard et al. (1999)
-!
-!  3. Method
-!
-!     Expression given by Becq-Girard et al. (1999) for spatial evolution
-!     of the continuous variance density E(fp) of component p:
-!
-!     E(fp)' = <shoaling term> + 4 * <SUM> - 8 * <DIF.>
-!
-!     <SUM>   = (1/Sp) * INT{0,fp}  Rm,p-m  * Im(B(fm,fp-fm)) dfm
-!     <DIF>   = (1/Sp) * INT{0,inf} R-m,p+m * Im(B*(-fm,fp+fm)) dfm
-!
-!     Im(B(fm,fp-fm)) = 0.5 * [  Rm,p-m * E(fm) * E(fp-fm) / Sp
-!                              - Rp,-m  * E(fp) * E(fm)    / Sp-m
-!                              - Rp,m-p * E(fp) * E(fp-fm) / Sm   ] * MU
-!
-!     Im(B*(-fm,fp+fm)) = Im(B(fm,-(fp+fm))) = Im(fm,fp)
-!     Im(B(fm,fp))    = 0.5 * [  Rm,p   * E(fp) * E(fm)    / Sp+m
-!                              - Rp+m,-m* E(p+m)* E(fm)    / Sp
-!                              - Rp+m,-p* E(p+m)* E(fp)    / Sm   ] * MU
-!
-!     where Sx and Rx,y are coupling coeffients (see TCOEF)
-!
-!     MU = Im(1/(delta_k - iK)) = K / (delta_k^2 + K^2)
-!
-!     delta_k = k1,2 - k1 - k2 = kp-m + km -kp = kp+m -km - kp
-!     K       = (C1 * k_p) + C2
-!        where k_p is the peak wave number; defaults C1 = 0.95, C2 = - 0.75
-!
-!     The source term is then given by:     cg,p(4*<SUM> - 8*<DIF.>)
-!        where cg,p is the group velocity of component p, freq = fp
-!
-!     Note(1): in the literature occasionally the following form is given:
-!
-!      (cg,p*Rx,y/Rx+y) * [Ia,b - Ia+b,-a - Ia+b,-b]
-!
-!      where Ia,b = sqrt(cg|a+b|/cg|a|/cg|b|)*cg|a|*cg|b| * Ja,b
-!            Ja,b = Ra,b * E(a) * E(b) / Sa+b
-!
-!      The end summation is then divided by factor: sqrt(cg,p*cg,x*cg,y)
-!
-!      All the velocity terms cancel to simply a factor cg,p, i.e:
-!            (cg,p*Rx,y/Rx+y) * [Ja,b - Ja+b,-a - Ja+b,-b]
-!
-!    Note(2): the above expression is factored by a missing Df term
-!             from transforming from discrete to continuous
-!
-!  4. Argument variables
-
-!     AC2         action density
-!     CGO         group velocity
-!     DEP2        water depth
-!     IDCMIN      minimum counter in directional space
-!     IDCMAX      maximum counter in directional space
-!     IDDLOW      minimum direction that is propagated within a sweep
-!     IDDTOP      maximum direction that is propagated within a sweep
-!     IMATDA      main diagonal of the linear system
-!     IMATRA      right-hand side of system of equations
-!     ISSTOP      maximum frequency counter in a sweep
-!     KWAVE       wave number
-!     PLTRI       triad contribution in TEST points
-!     SPCSIG      relative frequencies in computational domain in sigma-space
-!
-      INTEGER IDDLOW, IDDTOP, ISSTOP
-      INTEGER IDCMIN(MSC), IDCMAX(MSC)
-!
-      REAL :: AC2(MDC,MSC,MCGRD)
-!
-      REAL :: CGO(MSC,MICMAX)
-      REAL :: DEP2(MCGRD)
-      REAL :: IMATDA(MDC,MSC), IMATRA(MDC,MSC)
-      REAL :: SPCSIG(MSC)
-      REAL :: KWAVE(MSC,MICMAX)
-      REAL :: PLTRI(MDC,MSC,NPTST)
-      REAL :: REDC0(MDC,MSC,MREDS)
-      REAL :: REDC1(MDC,MSC,MREDS)
-!
-!     Values from common
-!     MDC       : Size of array in theta-direction
-!     MSC       : Size of array in sigma-direction
-!     PI        : Circular constant Pi
-!     PTRIAD    : Tunable coefficients for nonlinear triad sourceterms
-!
-!     PTRIAD(6) : value for proportionality coefficient K
-!     PTRIAD(7) : value for proportionality coefficient K
-!
-!  6. Local variables
-!
-      INTEGER IS, ID, II
-      INTEGER IP ,IM, IT
-!
-      REAL :: KP, K
-!
-      REAL :: K1, K2, K12, W1, W2, W12, C1, C2, C12
-      REAL :: V0, R0, S0 , MU, DK
-      REAL :: R1, R2, R3 , S1, S2, S3
-      REAL :: I1, I2, I3 , EE1, EE2, EE3, CC1, CC2, CC3
-!
-      REAL :: SIGPI, STRI
-!
-!     --- for use of COAPP
-      REAL, ALLOCATABLE :: SX(:,:,:)
-      REAL, ALLOCATABLE :: KX(:,:,:)
-      REAL, ALLOCATABLE :: CGX(:,:,:)
-      REAL, ALLOCATABLE :: CX(:,:,:)
-      REAL, ALLOCATABLE :: E2(:,:)
-      REAL, ALLOCATABLE :: EI(:,:)
-      REAL, ALLOCATABLE :: EX(:,:,:,:)
-      REAL, ALLOCATABLE :: EIX(:,:,:,:)
-      REAL, ALLOCATABLE :: WX(:,:,:)
-!
-      REAL, ALLOCATABLE :: CONTS(:,:)   !sum contribution
-      REAL, ALLOCATABLE :: CONTD(:,:)   !difference contribution
-!
-!  7. SUBROUTINES USED
-!
-!     interaction coefficients are calculated in subroutine TCOEF
-!     interpolation and integration of energy densities in subroutine COAPP
-
-!  8. SUBROUTINES CALLING
-
-!     SOURCE
-
-!  9. ERROR MESSAGES
-
-!     ---
-
-! 10. REMARKS
-
-!     ---
-
-! 11. STRUCTURE
-
-!     -----------------------------------------------------------------
-
-!     -----------------------------------------------------------------
-
-! 13. Source text
-!
-!     --- allocate and initialize
-!
-      ALLOCATE (SX(MSC,MSC,2))
-      ALLOCATE (KX(MSC,MSC,2))
-      ALLOCATE (CGX(MSC,MSC,2))
-      ALLOCATE (CX(MSC,MSC,2))
-      ALLOCATE (E2(MDC,MSC))
-      ALLOCATE (EI(MDC,MSC))
-      ALLOCATE (EX(MDC,MSC,MSC,2))
-      ALLOCATE (EIX(MDC,MSC,MSC,2))
-      ALLOCATE (WX(MSC,MSC,2))
-!
-      ALLOCATE (CONTS(1:MDC,1:MSC))
-      ALLOCATE (CONTD(1:MDC,1:MSC))
-!
-      CONTS = 0.
-      CONTD = 0.
-!
-!     --- call COAPP for interpolation and integration of energy densities
-      CALL COAPP(AC2,SPCSIG,DEP2,IDCMIN,IDCMAX,1,SX,
-     &           KX,CX,CGX,E2,EI,EX,EIX,WX)
-!
-!     --- loop over directions propagated within sweep
-      DO II = IDDLOW, IDDTOP
-         ID = MOD ( II - 1 + MDC , MDC ) + 1
-         DO IP = 1, MSC
-!           --- define properties at IP
-            W1 = SPCSIG(IP)
-            K1 = KWAVE(IP,1)
-            C1 = CGO(IP,1)
-!
-!           --- sum contribution (m, p - m)
-!
-            IF (IP.GT.1) THEN
-               DO IM = 1, IP-1 !Eq. m
-!                 --- define remaining properties in sum triad
-                  W2  = SPCSIG(IM)
-                  K2  = KWAVE(IM,1)
-                  C2  = CGO(IM,1)
-                  W12 = SX(IP,IM,1)   !Eq. W1 - W2
-                  K12 = KX(IP,IM,1)
-                  C12 = CGX(IP,IM,1)
-                  KP  = MIN(K1,K2,K12)
-                  K   = (PTRIAD(6)*KP) + PTRIAD(7)
-!                 --- SPB vars.
-!                 DK = (p - m) + m - p
-                  DK = K12 + K2 - K1
-                  MU = K / ((DK**2) + (K**2))
-!                 --- coupling coefficients
-                  CALL TCOEF(W1 ,W2, W12,K1 ,K2, K12,DEP2,R0,S0,2)
-                  CALL TCOEF(W12,W1,-W2 ,K12,K1,-K2 ,DEP2,R2,S2,2)
-                  CALL TCOEF(W2 ,W1,-W12,K2 ,K1,-K12,DEP2,R3,S3,2)
-                  CC1 = R0 / S0
-                  CC2 = R2 / S2
-                  CC3 = R3 / S3
-!
-!                 --- compute energy products
-!                     (improved collinear approximation)
-!
-                  EE1 = 0.5 * (  E2(ID,IM) * EIX(ID,IP,IM,1)
-     &                         + EI(ID,IM) *  EX(ID,IP,IM,1))
-                  EE2 = 0.5 * (  E2(ID,IP) * EI(ID,IM)
-     &                         + EI(ID,IP) * E2(ID,IM))
-                  EE3 = 0.5 * (  E2(ID,IP) * EIX(ID,IP,IM,1)
-     &                         + EI(ID,IP) *  EX(ID,IP,IM,1))
-!
-!                 --- compute contribution
-!
-                  CONTS(ID,IP) = CONTS(ID,IP) + 0.5 * C1 * MU *
-     &                         (R0/S0) * (CC1*EE1 - CC2*EE2 - CC3*EE3) *
-     &                                 PTRIAD(1) * ((FRINTF*W2)/(2.*PI))
-
-               ENDDO
-            ENDIF
-!
-!           --- difference contribution (p + m, m)
-!
-            DO IM = 1, MSC !Eq. m
-!              --- define rem. properties in diff. triad
-               W2 = SPCSIG(IM)
-               K2 = KWAVE(IM,1)
-               C2 = CGO(IM,1)
-               W12 = SX(IP,IM,2)   !Eq. W1 + W2
-               K12 = KX(IP,IM,2)
-               C12 = CGX(IP,IM,2)
-               KP  = MIN(K1,K2,K12)
-               K   = (PTRIAD(6)*KP) + PTRIAD(7)
-!              --- SPB vars.
-!              DK = (p + m) - m - p
-               DK = K12 - K2 - K1
-               MU = K / ((DK**2) + (K**2))
-!              --- coupling coefficients
-               CALL TCOEF(W12,W1,W2,K12,K1,K2,DEP2,R1,S1,2)
-               CALL TCOEF(W2,-W1,W12,K2,-K1,K12,DEP2,R2,S2,2)
-               CALL TCOEF(W1,-W2,W12,K1,-K2,K12,DEP2,R0,S0,2)
-               CC1 = R1 / S1
-               CC2 = R2 / S2
-               CC3 = R0 / S0
-!
-!              --- compute energy products
-!                  (improved collinear approximation)
-!
-               EE1 = 0.5 * (  E2(ID,IP) * EI(ID,IM)
-     &                      + EI(ID,IP) * E2(ID,IM))
-               EE2 = 0.5 * (  E2(ID,IP) * EIX(ID,IP,IM,2)
-     &                      + EI(ID,IP) *  EX(ID,IP,IM,2))
-               EE3 = 0.5 * (  E2(ID,IM) * EIX(ID,IP,IM,2)
-     &                      + EI(ID,IM) *  EX(ID,IP,IM,2))
-!
-!              --- compute contributions
-!
-               CONTD(ID,IP) = CONTD(ID,IP) + 0.5 * C1 * MU *
-     &                        (R0/S0) * (CC1*EE1 - CC2*EE2 - CC3*EE3) *
-     &                                PTRIAD(1) * ((FRINTF*W2)/(2.*PI))
-
-            ENDDO
-         ENDDO
-      ENDDO
-!
-!     --- compute total contribution
-!
-      DO IS = 1, ISSTOP
-          SIGPI = SPCSIG(IS) * 2. * PI ! Factor to convert back to N(sigma)
-          DO II = IDCMIN(IS), IDCMAX(IS)
-              ID = MOD ( II - 1 + MDC , MDC ) + 1
-              !
-              STRI = (4. * CONTS(ID,IS)) - (8. * CONTD(ID,IS))
-              !
-              IF(TESTFL) PLTRI(ID,IS,IPTST) = STRI / SIGPI
-              !
-              ! --- store results in RHS and main diagonal according
-              !     to Patankar-rules
-              !
-              IF (STRI .GT. 0.) THEN
-                 IMATRA(ID,IS) = IMATRA(ID,IS) + STRI / SIGPI
-                 REDC0(ID,IS,2)= REDC0(ID,IS,2)+ STRI / SIGPI
-              ELSE
-                 IMATDA(ID,IS) = IMATDA(ID,IS) - STRI /
-     &                           MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
-                 REDC1(ID,IS,2)= REDC1(ID,IS,2)+ STRI /
-     &                           MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
-              ENDIF
-          ENDDO
-      ENDDO
-!
-      DEALLOCATE(SX,KX,CGX,CX,E2,EI,EX,EIX,WX,CONTS,CONTD)
-!
-      RETURN
-      END subroutine SWSPB
 !
 !****************************************************************
 !
@@ -4545,6 +4226,8 @@
 !     PLTRI       triad contribution in TEST points
 !     QTL1        frequency-dependent interpolation factors
 !     QTL2        frequency-dependent scaling factors
+!     REDC0       explicit part of energy redistribution for output purposes
+!     REDC1       implicit part of energy redistribution for output purposes
 !     SIGM        mean angular frequency
 !     SPCSIG      relative frequencies in computational domain in sigma-space
 !     URSELL      Ursell number
@@ -4826,6 +4509,8 @@
 !     PLTRI       triad contribution in TEST points
 !     QTL1        frequency-dependent interpolation factors
 !     QTL2        frequency-dependent scaling factors
+!     REDC0       explicit part of energy redistribution for output purposes
+!     REDC1       implicit part of energy redistribution for output purposes
 !     SIGM        mean angular frequency
 !     SPCDIR      (*,1); spectral directions (radians)
 !                 (*,2); cosine of spectral directions
@@ -5240,6 +4925,388 @@
       END FUNCTION SANDN
 
       END SUBROUTINE SWDNCTA
+!
+!****************************************************************
+!
+      SUBROUTINE SWFTIM ( AC2   , SPCSIG,
+     &                    IMATRA, IMATDA, REDC0 , REDC1 ,
+     &                    IDDLOW, IDDTOP, ISSTOP, IDCMIN, IDCMAX,
+     &                    PLTRI , URSELL, BIPHAS,
+     &                    QTL1  , QTL2  )
+!
+!****************************************************************
+!
+      USE OCPCOMM4
+      USE SWCOMM3
+      USE SWCOMM4
+      USE M_SNL3
+!
+      IMPLICIT NONE
+!
+!
+!   --|-----------------------------------------------------------|--
+!     | Delft University of Technology                            |
+!     | Faculty of Civil Engineering and Geosciences              |
+!     | Environmental Fluid Mechanics Section                     |
+!     | P.O. Box 5048, 2600 GA  Delft, The Netherlands            |
+!     |                                                           |
+!     | Programmer: Marcel Zijlema                                |
+!   --|-----------------------------------------------------------|--
+!
+!
+!     SWAN (Simulating WAves Nearshore); a third generation wave model
+!     Copyright (C) 1993-2024  Delft University of Technology
+!
+!     This program is free software: you can redistribute it and/or modify
+!     it under the terms of the GNU General Public License as published by
+!     the Free Software Foundation, either version 3 of the License, or
+!     (at your option) any later version.
+!
+!     This program is distributed in the hope that it will be useful,
+!     but WITHOUT ANY WARRANTY; without even the implied warranty of
+!     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+!     GNU General Public License for more details.
+!
+!     You should have received a copy of the GNU General Public License
+!     along with this program. If not, see <http://www.gnu.org/licenses/>.
+!
+!
+!  0. Authors
+!
+!     42.15: Marcel Zijlema
+!
+!  1. Updates
+!
+!     42.15, May 2024: New subroutine
+!
+!  2. Purpose
+!
+!     Computes triad source term by means of the full triad
+!     interaction model (FTIM) with the parametrized bispectrum
+!
+!  3. Method
+!
+!     The spatial evolution equation for energy density is
+!     expressed in terms of the full integration of the
+!     imaginary part of the parametrized bispectrum
+!
+!     The integration over the entire frequency space is splitted
+!     into the sum interaction and the difference interaction
+!
+!     The parametrization of the bispectrum is related either
+!     to the quasi-normal closure with parametrized biphase or
+!     the closure hypothesis of Holloway (1980) using a
+!     parameter that represents the broadness of the resonance
+!     condition
+!
+!     Both closures express the fourth-order moments of wave
+!     energy distribution in terms of the second-order ones
+!
+!     Only collinear interactions are included
+!
+!     The consistent collinear approximation (CCA) of
+!     Salmon et al (2016) is applied
+!
+!  4. Argument variables
+!
+!     AC2         action density
+!     BIPHAS      parameterized biphase of the spectrum
+!     IDCMIN      minimum counter in directional space
+!     IDCMAX      maximum counter in directional space
+!     IDDLOW      minimum direction that is propagated within a sweep
+!     IDDTOP      maximum direction that is propagated within a sweep
+!     IMATDA      main diagonal of the linear system
+!     IMATRA      right-hand side of system of equations
+!     ISSTOP      maximum frequency counter in a sweep
+!     PLTRI       triad contribution in TEST points
+!     QTL1        frequency-dependent interpolation factors
+!     QTL2        frequency-dependent scaling factors
+!     REDC0       explicit part of energy redistribution for output purposes
+!     REDC1       implicit part of energy redistribution for output purposes
+!     SPCSIG      relative frequencies in computational domain in sigma-space
+!     URSELL      Ursell number
+!
+      INTEGER IDDLOW, IDDTOP, ISSTOP
+      INTEGER IDCMIN(MSC), IDCMAX(MSC)
+
+      REAL :: AC2(MDC,MSC,MCGRD)
+      REAL :: IMATDA(MDC,MSC), IMATRA(MDC,MSC)
+      REAL :: SPCSIG(MSC)
+      REAL :: PLTRI(MDC,MSC,NPTST)
+      REAL :: URSELL(MCGRD)
+      REAL :: BIPHAS(MCGRD)
+      REAL :: REDC0 (MDC,MSC,MREDS)
+      REAL :: REDC1 (MDC,MSC,MREDS)
+      REAL :: QTL1(MSC4D,2), QTL2(MSC4D,2)
+!
+!  6. Local variables
+!
+!     BIPH  :     local biphase
+!     CCx   :     the quadratic transfer functions
+!     CDIF  :     contribution due to difference interactions
+!     CSUM  :     contribution due to sum interactions
+!     E     :     energy density as function of frequency
+!     E0    :     energy density of bound super harmonic (=p)
+!     ED    :     integral energy density over directions
+!     ED0   :     integral energy density over directions of harmonic p
+!     EDM   :     integral energy density over directions of second
+!                 primary harmonic (m)
+!     EDPM  :     integral energy density over directions of first
+!                 primary harmonic (p-m)
+!     EEx   :     quadratic products of energy density
+!     EM    :     energy density of second primary harmonic (m)
+!     EPM   :     energy density of first primary harmonic (p-m)
+!     FT    :     multiplication factor for triad contribution
+!     ID    :     counter
+!     ID1   :     first directional index
+!     ID2   :     last directional index
+!     IDD   :     another counter
+!     IDDUM :     loop counter in direction space
+!     IDW   :     directional range / 2
+!     IENT  :     number of entries
+!     II    :     loop counter
+!     IM    :     frequency counter of second primary harmonic
+!     IP    :     frequency counter of bound super harmonic
+!     IPM   :     frequency counter of first primary frequency
+!     IS    :     loop counter in frequency space
+!     J     :     counter
+!     PWDTH :     integral range in rad. / 2
+!     SIGPI :     Jacobian
+!     SINBPH:     sine of biphase
+!     STRI  :     total triad contribution
+!     W0    :     radian frequency of bound super harmonic (p)
+!     WIS   :     interpolation weight factor
+!     WM    :     radian frequency of secondary harmonic (m)
+!     WPM   :     radian frequency of primary harmonic (p-m)
+!
+      INTEGER IENT, II, J
+      INTEGER ID, ID1, ID2, IDD, IDDUM, IDW, IM, IP, IPM, IS
+      REAL    BIPH, E0, ED0, EDM, EDPM, EM, EPM, FT,
+     &        PWDTH, SIGPI, SINBPH, STRI, W0, WIS, WM, WPM
+      REAL    CC1, CC2, CC3, EE1, EE2, EE3
+      REAL    E(MSC), ED(MSC), CDIF(MDC,MSC), CSUM(MDC,MSC)
+!
+!  9. Subroutines calling
+!
+!     SOURCE
+!
+! 13. Source text
+!
+      SAVE IENT
+      DATA IENT/0/
+      IF (LTRACE) CALL STRACE (IENT,'SWFTIM')
+!
+      BIPH = BIPHAS(KCGRD(1))
+!
+      E    = 0.
+      ED   = 0.
+      CDIF = 0.
+      CSUM = 0.
+!
+!     --- compute 3 wave-wave interactions
+!
+      IF ( .NOT.URSELL(KCGRD(1)).LT.PTRIAD(5) ) THEN
+!
+!        --- determine sine of biphase, if required
+!
+         IF ( ITRIAD.EQ.2 ) THEN
+            SINBPH = 1.
+         ELSE IF ( ITRIAD.EQ.3 ) THEN
+            SINBPH = SIN(-BIPH)
+         ENDIF
+!
+!        --- determine directional range for CCA integration
+!
+         IF ( PTRIAD(8).NE.-1. ) THEN
+            PWDTH = PTRIAD(8) * PI/180.
+            IDW = NINT(PWDTH/(2.*DDIR))
+         ELSE
+!           full directional integration
+            IDW = -1
+         ENDIF
+!
+!        --- calculate integral of E(f,t) over all directions, if desired
+         IF ( IDW.EQ.-1 ) THEN
+            ED(:) = SUM(AC2(:,:,KCGRD(1)),DIM=1) * 2.*PI*SPCSIG(:) *DDIR
+         ENDIF
+!
+         DO II = IDDLOW, IDDTOP
+            ID = MOD ( II - 1 + MDC , MDC ) + 1
+!
+!           --- initialize array with E(f) for the direction theta considered
+!
+            E(:) = AC2(ID,:,KCGRD(1)) * 2. * PI * SPCSIG(:)
+!
+!           --- integrate E(f,t) over range dir-p <= theta <= dir+p
+!
+            IF ( IDW.NE.-1 ) THEN
+               ID1 = II - IDW
+               ID2 = II + IDW
+               IF ( .NOT.FULCIR ) THEN
+                  ID1 = MAX(ID1,  1)
+                  ID2 = MIN(ID2,MDC)
+               ENDIF
+               ED(:) = 0.
+               DO IDDUM = ID1, ID2
+                  IDD = MOD( IDDUM - 1 + MDC , MDC ) + 1
+                  ED(:) = ED(:) + AC2(IDD,:,KCGRD(1))
+               ENDDO
+               ED(:) = ED(:) * 2. * PI * SPCSIG(:)
+               IF ( IDW.NE.0 ) ED = ED * DDIR
+            ENDIF
+!
+            J = 0
+!
+!           --- compute full triad integration (collinear)
+!
+            DO IP = 1, MSC
+!
+!              --- bound super harmonic
+               E0  = E     (IP)
+               ED0 = ED    (IP)
+               W0  = SPCSIG(IP)
+!
+!              --- sum contribution (m, p - m)
+!
+               DO IM = 1, IP-1
+!
+!                 --- secondary wave
+!
+                  EM  = E     (IM)
+                  EDM = ED    (IM)
+                  WM  = SPCSIG(IM)
+!
+!                 --- primary wave
+!
+                  WPM = W0 - WM
+!
+                  J = J + 1
+!
+!                 --- obtain primary energy density by means of interpolation
+!
+                  IF ( WPM.GT.SPCSIG(1) ) THEN
+!
+                     WIS = QTL1(J,1)
+                     IPM = INT(QTL1(J,2))
+
+                     EPM  = (1.-WIS) * E (IPM) + WIS * E (IPM+1)
+                     EDPM = (1.-WIS) * ED(IPM) + WIS * ED(IPM+1)
+!
+                  ELSE
+!
+                     EPM  = 0.
+                     EDPM = 0.
+!
+                  ENDIF
+!
+!                 --- compute quadratic products of energy density
+!                     (improved collinear approximation)
+!
+                  EE1 = 0.5 * ( EM*EDPM + EDM*EPM )
+                  EE2 = 0.5 * ( E0*EDPM + ED0*EPM )
+                  EE3 = 0.5 * ( EM*ED0  + EDM*E0  )
+!
+!                 --- assemble the triad contributions
+!
+                  FT = QTL2(J,1) * SINBPH
+!
+                  CC1 = QTL2(J,2)
+                  CC2 = QTL2(J,3)
+                  CC3 = QTL2(J,4)
+!
+                  STRI = CC1*EE1 - CC2*EE2 - CC3*EE3
+!
+                  CSUM(ID,IP) = CSUM(ID,IP) + FT * STRI
+!
+               ENDDO
+!
+!              --- difference contribution (p + m, m)
+!
+               DO IM = 1, MSC
+!
+!                 --- secondary wave
+!
+                  EM  = E     (IM)
+                  EDM = ED    (IM)
+                  WM  = SPCSIG(IM)
+!
+!                 --- primary wave
+!
+                  WPM = W0 + WM
+!
+                  J = J + 1
+!
+!                 --- obtain primary energy density by means of interpolation
+!
+                  IF ( WPM.LT.SPCSIG(MSC) ) THEN
+!
+                     WIS = QTL1(J,1)
+                     IPM = INT(QTL1(J,2))
+
+                     EPM  = (1.-WIS) * E (IPM) + WIS * E (IPM+1)
+                     EDPM = (1.-WIS) * ED(IPM) + WIS * ED(IPM+1)
+!
+                  ELSE
+!
+                     EPM  = 0.
+                     EDPM = 0.
+!
+                  ENDIF
+!
+!                 --- compute quadratic products of energy density
+!                     (improved collinear approximation)
+!
+                  EE1 = 0.5 * ( EM*ED0  + EDM*E0  )
+                  EE2 = 0.5 * ( E0*EDPM + ED0*EPM )
+                  EE3 = 0.5 * ( EM*EDPM + EDM*EPM )
+!
+!                 --- assemble the triad contributions
+!
+                  FT = QTL2(J,1) * SINBPH
+!
+                  CC1 = QTL2(J,2)
+                  CC2 = QTL2(J,3)
+                  CC3 = QTL2(J,4)
+!
+                  STRI = CC1*EE1 - CC2*EE2 - CC3*EE3
+!
+                  CDIF(ID,IP) = CDIF(ID,IP) + FT * STRI
+!
+               ENDDO
+!
+            ENDDO
+!
+         ENDDO
+!
+!        --- put source term together
+!
+         DO IS = 1, ISSTOP
+            SIGPI = SPCSIG(IS) * 2. * PI
+            DO IDDUM = IDCMIN(IS), IDCMAX(IS)
+               ID = MOD ( IDDUM - 1 + MDC , MDC ) + 1
+!
+               STRI = 2.*CSUM(ID,IS) - 4.*CDIF(ID,IS)
+!
+!              --- store results in rhs and main diagonal according
+!                  to Patankar-rules
+!
+               IF (TESTFL) PLTRI(ID,IS,IPTST) = STRI / SIGPI
+               IF (STRI.GT.0.) THEN
+                  IMATRA(ID,IS) = IMATRA(ID,IS) + STRI / SIGPI
+                  REDC0(ID,IS,2)= REDC0(ID,IS,2)+ STRI / SIGPI
+               ELSE
+                  IMATDA(ID,IS) = IMATDA(ID,IS) - STRI /
+     &                            MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
+                  REDC1(ID,IS,2)= REDC1(ID,IS,2)+ STRI /
+     &                            MAX(1.E-18,AC2(ID,IS,KCGRD(1))*SIGPI)
+               END IF
+            END DO
+         END DO
+!
+      END IF
+!
+      RETURN
+      END
 !
 !****************************************************************
 !

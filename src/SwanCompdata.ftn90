@@ -65,6 +65,8 @@ module SwanCompdata
 !$omp threadprivate(vs)
 !
     integer, dimension(:,:), save, allocatable :: blist  ! list of boundary vertices in ascending order for each boundary polygon
+    integer, dimension(:,:), save, allocatable :: bmark  ! list of corresponding boundary markers for each boundary polygon
+    integer, dimension(:,:), save, allocatable :: bvertg ! global index of boundary vertex in own subdomain
     integer, dimension(:,:), save, allocatable :: vlist  ! vertex list
 !
 !   Source text

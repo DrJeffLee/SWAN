@@ -78,10 +78,10 @@ subroutine SwanPrepComp ( cross )
     if (allocated(kvertc)) deallocate(kvertc)
     if (allocated(kvertf)) deallocate(kvertf)
     !
-    ! ghost vertices are regarded as vertices with boundary condition
+    ! ghost and exception vertices are regarded as vertices with boundary condition
     !
     do ivert = 1, nverts
-       if ( vmark(ivert) == 999 ) vert(ivert)%atti(VBC) = 1
+       if ( vmark(ivert) >= excmark ) vert(ivert)%atti(VBC) = 1
     enddo
     !
     ! find obstacles in computational grid, if present
