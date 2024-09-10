@@ -2591,11 +2591,12 @@
       REAL      CRDP, CRDM, SOMX, SOMY
       REAL      XP,YP,XC,YC,RR,DIRSI,COSDIR,SINDIR,DIRSID,DIRREF
       REAL      RLEN1,RDIST,RLEN2,XC1,YC1,XC2,YC2,W1
-      REAL      DET, X1, Y1, X2, Y2, X3, Y3                               43.01
+      REAL      DET, DXLOC, DYLOC, X1, Y1, X2, Y2, X3, Y3                 43.01
 
       LOGICAL   KEYWIS, LOCGRI, CCW, BPARF, BOUNPT, DONALL
       LOGICAL   LFRST1, LFRST2, LFRST3                                    40.31
       LOGICAL, SAVE :: BNDDONE = .FALSE.                                  43.01
+      LOGICAL   SwanPointinMesh                                           43.01
 
       INTEGER   NUMP
 
@@ -3230,33 +3231,29 @@
                   Y2 = ycugrdgl(IXG2)                                     43.01 40.80
 !
 !                 an arbitrary internal point                             40.92
-                  DX = mingsiz                                            43.01
-                  DY = mingsiz                                            43.01
-                  DO IP=1,4
-                     X3 = X1 - DX
-                     Y3 = Y1 - DY
-                     CALL SwanFindPoint ( X3, Y3, IX )
-                     IF ( PARLL ) THEN
-                        IF ( IX.GT.0 ) THEN
-                           IXG = ivertg(IX)
-                        ELSE
-                           IXG = -999
-                        ENDIF
-                        CALL SWREDUCE( IXG, 1, SWINT, SWMAX )
-                     ELSE
-                        IXG = IX
-                     ENDIF
+                  DXLOC = mingsiz                                         43.01
+                  CALL SWREDUCE ( DXLOC, 1, SWREAL, SWMIN )               43.01
+                  DYLOC = DXLOC                                           43.01
+                  DO IP = 1, 4
+                     X3 = X1 - DXLOC                                      43.01
+                     Y3 = Y1 - DYLOC                                      43.01
+                     IF ( SwanPointinMesh( X3, Y3 ) ) THEN                43.01
+                        IXG =  1                                          43.01
+                     ELSE                                                 43.01
+                        IXG = -1                                          43.01
+                     ENDIF                                                43.01
+                     CALL SWREDUCE( IXG, 1, SWINT, SWMAX )                43.01
                      IF ( JBG.GT.1 .AND. IXG.LT.0 ) THEN
-                        X3 = X1 + DX
-                        Y3 = Y1 + DY
+                        X3 = X1 + DXLOC                                   43.01
+                        Y3 = Y1 + DYLOC                                   43.01
                         EXIT
                      ELSEIF ( JBG.EQ.1 .AND. IXG.GT.0 ) THEN
                         EXIT
                      ENDIF
                      IF ( MOD(IP,2).EQ.0 ) THEN
-                        DX = -DX
+                        DXLOC = -DXLOC                                    43.01
                      ELSE
-                        DY = -DY
+                        DYLOC = -DYLOC                                    43.01
                      ENDIF
                   ENDDO
 !
