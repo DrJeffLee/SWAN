@@ -263,4 +263,4 @@ See
 For bug reports please send to the [SourceForge mailing list](http://sourceforge.net/mail/?group_id=384349).
 
 
-<small>&copy; Copyright 2024  Marcel Zijlema</small>
+<small>&copy; Copyright 2025  Marcel Zijlema</small>

@@ -1545,6 +1545,10 @@
           ENDIF
 !
           ORQTMP%OQI(3) = NVAR                                            40.31
+          IF (NVAR.EQ.0) THEN                                             42.16
+             ALLOCATE(ORQTMP%IVTYP(0))                                    42.16
+             ALLOCATE(ORQTMP%FAC(0))                                      42.16
+          ENDIF                                                           42.16
           NULLIFY(ORQTMP%NEXTORQ)                                         40.31
           IF ( .NOT.LORQ ) THEN                                           40.31
              FORQ = ORQTMP                                                40.31
@@ -1834,6 +1838,10 @@
           CALL INITVD ('DELT', ORQTMP%OQR(2), 'REQ', 0D0)                 40.31 30.00
         ENDIF
         ORQTMP%OQI(3) = NVAR                                              40.31
+        IF (NVAR.EQ.0) THEN                                               42.16
+           ALLOCATE(ORQTMP%IVTYP(0))                                      42.16
+           ALLOCATE(ORQTMP%FAC(0))                                        42.16
+        ENDIF                                                             42.16
         NULLIFY(ORQTMP%NEXTORQ)                                           40.31
         IF ( .NOT.LORQ ) THEN                                             40.31
            FORQ = ORQTMP                                                  40.31

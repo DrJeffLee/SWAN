@@ -403,12 +403,9 @@ subroutine SwanGridFace ( nfaces, ncells, nverts, xcugrd, ycugrd, kvertf )
           xcr = cell(icellr)%attr(CELLCX)
           ycr = cell(icellr)%attr(CELLCY)
           !
-          ! compute the distance between the face center and the centroid
-          ! and subsequently, compute the distance between the centroids
+          ! compute the distance between the centroids
           !
-          dxl = sqrt( (xcf-xcl)*(xcf-xcl) + (ycf-ycl)*(ycf-ycl) )
-          dxr = sqrt( (xcf-xcr)*(xcf-xcr) + (ycf-ycr)*(ycf-ycr) )
-          dxf = dxl + dxr
+          dxf = sqrt( (xcr-xcl)*(xcr-xcl) + (ycr-ycl)*(ycr-ycl) )
           !
           if ( dxf /= 0. ) then
              face(iface)%attr(FACEDISTG) =  1. / dxf
