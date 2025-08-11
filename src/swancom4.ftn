@@ -5037,7 +5037,7 @@
       REAL :: BIPHAS(MCGRD)
       REAL :: REDC0 (MDC,MSC,MREDS)
       REAL :: REDC1 (MDC,MSC,MREDS)
-      REAL :: QTL1(MSC4D,2), QTL2(MSC4D,2)
+      REAL :: QTL1(MSC4D,2), QTL2(MSC4D,4)
 !
 !  6. Local variables
 !

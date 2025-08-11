@@ -423,7 +423,7 @@ subroutine SwanCompUnstruc ( ac2, ac1, compda, spcsig, spcdir, xytst, cross, it 
     ! initialization of shared arrays
     !
     hscurr = 0.
-    hsprev = 0.
+    hsprev = 99999.
     hsdifc = 0.
     tmcurr = 0.
     tmprev = 0.
