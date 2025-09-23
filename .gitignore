@@ -1,7 +1,5 @@
 # Build artifacts
 /build/
-/bin/
-!/bin/swanrun*
 
 # CMake files
 CMakeCache.txt
@@ -9,6 +7,10 @@ CMakeFiles/
 cmake_install.cmake
 build.ninja
 .ninja_log
+
+# Preprocessed FORTRAN files
+*.f
+*.f90
 
 # Compiled binaries
 *.mod
