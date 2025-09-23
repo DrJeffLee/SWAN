@@ -1,6 +1,8 @@
 #!/bin/bash
-cd "$(dirname "${BASH_SOURCE[0]}")" # Executes from the directory containing the script
 set -e # Exit on error
+
+# Execute from the top-level SWAN directory
+cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
 
 echo "Cleaning build artifacts..."
 
