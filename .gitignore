@@ -1,5 +1,7 @@
 # Build artifacts
 /build/
+/bin/
+!/bin/swanrun*
 
 # CMake files
 CMakeCache.txt
