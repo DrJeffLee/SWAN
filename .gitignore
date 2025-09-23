@@ -1,0 +1,24 @@
+# Build artifacts
+/build/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+build.ninja
+.ninja_log
+
+# Compiled binaries
+*.mod
+*.o
+*.obj
+*.exe
+*.out
+*.so
+*.a
+*.dll
+
+# IDE files
+*.swp
+*.sublime-workspace
+*.vscode/
