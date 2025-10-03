@@ -1,0 +1,38 @@
+PROJECT 'PF_Tank' '01'
+'Simple Tank Simulation'
+'Varying Bottom Test'
+
+SET 0 90 0.05 200 3 9.81 1025 99999 MODE STATionary TWODimensional 
+COORDinates CARTesian
+
+CGRID REGular 0.0 0.0 0.0 16.8 12 336 240 CIRcle 36 0.04 1.0 40
+
+$CGRID REGular [xpc] [ypc] [alpc] [xlenc] [ylenc] [mxc] [myc] [mdc] [flow] [fhigh] [msc]
+
+INPgrid BOTtom REGular 0.0 0.0 0.0 336 240 0.05 0.05
+READinp BOTtom Fname'swan_bathymetry_coastal.dat'
+
+READinp NPLAnts Fname'Veg.dat'
+
+
+BOUnd SHAPespec JONswap 3.3 PEAK POWER
+BOUndspec SIDE East CONstant PAR 0.06 1.2 180 0
+
+INITial ZERO
+
+GEN3 WESTH
+OFF QUAD
+BREaking CONstant 1.0 0.73
+VEGEtation 2 0.5 0.04 500 1.1
+FRICtion JONswap CONstant 0.038
+
+
+NUMERIC STOPC 0.005 0.01 0.005 99.5 & STAT 50 0.00 0.1
+
+
+FRAME 'output' 0.0 0.0 0.0 16.8 12 336 240
+BLOck 'output' 'full_domain_hs.dat' HSign
+TABLE 'output' 'full_domain_table.dat' HSign PER DEPTH
+
+COMPUTE 
+STOP
