@@ -8,7 +8,8 @@ cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")"
 mkdir -p build
 
 # Configure with Ninja
-cmake -S . -B build -G Ninja -DCMAKE_INSTALL_PREFIX="$(pwd)"
+# cmake -S . -B build -G Ninja -DCMAKE_INSTALL_PREFIX="$(pwd)"
+cmake -S . -B build -G Ninja
 
 # Build
 cmake --build build
